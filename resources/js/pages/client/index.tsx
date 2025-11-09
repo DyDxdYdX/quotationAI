@@ -264,7 +264,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                             </div>
                         ) : (
                             <>
-                                <div className='overflow-x-auto px-6'>
+                                <div className='overflow-x-auto px-4'>
                                     <Table>
                                         <TableHeader>
                                             <TableRow className='border-b bg-muted/50 hover:bg-muted/50'>

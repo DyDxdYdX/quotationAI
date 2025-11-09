@@ -276,10 +276,11 @@ export default function Quotation({ quotations, per_page_request = '10', clients
                             </div>
                         ) : (
                             <>
-                                <div className='overflow-x-auto px-6'>
+                                <div className='overflow-x-auto px-4'>
                                     <Table>
                                         <TableHeader>
                                             <TableRow className='border-b bg-muted/50 hover:bg-muted/50'>
+                                                <TableHead className='h-12 font-semibold text-sm text-foreground'>Quotation ID</TableHead>
                                                 <TableHead className='h-12 font-semibold text-sm text-foreground'>Client</TableHead>
                                                 <TableHead className='h-12 font-semibold text-sm text-foreground'>Service Type</TableHead>
                                                 <TableHead className='h-12 font-semibold text-sm text-foreground'>Status</TableHead>
@@ -290,6 +291,9 @@ export default function Quotation({ quotations, per_page_request = '10', clients
                                         <TableBody>
                                             {quotations.data.map((quotation) => (
                                                 <TableRow key={quotation.id} className='border-b hover:bg-muted/30 transition-colors duration-150'>
+                                                    <TableCell className='py-4'>
+                                                        <span className='font-medium text-foreground'>QTT-{quotation.id.toString().padStart(6, '0')}</span>
+                                                    </TableCell>
                                                     <TableCell className='py-4'>
                                                         <span className='font-medium text-foreground'>{quotation.client?.company_name || 'N/A'}</span>
                                                     </TableCell>

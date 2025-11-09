@@ -55,8 +55,16 @@ interface Client {
     company_name: string;
     company_address: string;
     company_city: string;
-    quotation_requests?: any[];
-    quotations?: any[];
+    quotation_requests?: Array<{
+        id: number;
+        service_type: string;
+        message: string;
+    }>;
+    quotations?: Array<{
+        id: number;
+        quotation_status: string;
+        created_at: string;
+    }>;
     created_at: string;
     updated_at: string;
 }
@@ -204,103 +212,131 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
             <Head title="Manage Client" />
             
             {/* Client Summary Cards */}
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-4 m-4'>
-                <Card className='bg-sidebar'>
-                    <CardHeader className='font-bold text-lg'>
-                        {clientSummary[0].title}
-                    </CardHeader>
-                    <CardContent className='text-2xl font-semibold'>
-                        {clientSummary[0].value}
-                    </CardContent>
-                </Card>
-                <Card className='bg-sidebar'>
-                    <CardHeader className='font-bold text-lg'>
-                        {clientSummary[1].title}
-                    </CardHeader>
-                    <CardContent className='text-2xl font-semibold'>
-                        {clientSummary[1].value}
-                    </CardContent>
-                </Card>
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-6 px-6 py-4'>
+                {clientSummary.map((summary, index) => {
+                    const colors = [
+                        'from-blue-500 to-blue-600',
+                        'from-purple-500 to-purple-600',
+                    ];
+                    return (
+                        <Card key={index} className='border-0 shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden'>
+                            <div className={`h-1.5 bg-gradient-to-r ${colors[index % colors.length]}`} />
+                            <CardHeader className='pb-2'>
+                                <p className='text-sm font-medium text-muted-foreground uppercase tracking-wide'>
+                                    {summary.title}
+                                </p>
+                            </CardHeader>
+                            <CardContent>
+                                <p className='text-3xl font-bold text-foreground'>
+                                    {summary.value}
+                                </p>
+                            </CardContent>
+                        </Card>
+                    );
+                })}
             </div>
 
             {/* Client Table */}
-            <div className='m-4'>
-                <Card className='bg-sidebar'>
-                    <CardHeader className='flex flex-row items-center justify-between'>
-                        <h2 className='text-xl font-bold'>Clients List</h2>
-                        <Button onClick={handleCreate} className='flex items-center gap-2'>
+            <div className='px-6 pb-6'>
+                <Card className='border shadow-sm'>
+                    <CardHeader className='flex flex-row items-center justify-between border-b bg-muted/30'>
+                        <div>
+                            <h2 className='text-2xl font-bold text-foreground'>Clients</h2>
+                            <p className='text-sm text-muted-foreground mt-1'>Manage and track all client information</p>
+                        </div>
+                        <Button onClick={handleCreate} className='flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm'>
                             <PlusIcon className='w-4 h-4' />
                             Add New Client
                         </Button>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className='p-0'>
                         {clients.data.length === 0 ? (
-                            <div className='text-center py-8 text-muted-foreground'>
-                                <p>No clients found.</p>
+                            <div className='text-center py-16'>
+                                <div className='mx-auto w-24 h-24 rounded-full bg-muted flex items-center justify-center mb-4'>
+                                    <PlusIcon className='w-12 h-12 text-muted-foreground' />
+                                </div>
+                                <p className='text-lg font-medium text-foreground mb-2'>No clients found</p>
+                                <p className='text-sm text-muted-foreground mb-6'>Get started by adding your first client</p>
+                                <Button onClick={handleCreate} className='gap-2'>
+                                    <PlusIcon className='w-4 h-4' />
+                                    Add New Client
+                                </Button>
                             </div>
                         ) : (
                             <>
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className='font-bold'>Company Name</TableHead>
-                                            <TableHead className='font-bold'>Supervisor</TableHead>
-                                            <TableHead className='font-bold'>Email</TableHead>
-                                            <TableHead className='font-bold'>Phone</TableHead>
-                                            <TableHead className='font-bold'>City</TableHead>
-                                            <TableHead className='font-bold'>Quotations</TableHead>
-                                            <TableHead className='font-bold'>Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {clients.data.map((client) => (
-                                            <TableRow key={client.id}>
-                                                <TableCell className='font-medium'>
-                                                    {client.company_name}
-                                                </TableCell>
-                                                <TableCell>{client.supervisor_name}</TableCell>
-                                                <TableCell>{client.company_email}</TableCell>
-                                                <TableCell>{client.company_phone_number}</TableCell>
-                                                <TableCell>{client.company_city}</TableCell>
-                                                <TableCell>
-                                                    {client.quotations?.length || 0}
-                                                </TableCell>
-                                                <TableCell>
-                                                <Button 
-                                                    variant='default' 
-                                                    size='icon' 
-                                                    className='mr-2'
-                                                    onClick={() => handleView(client)}
-                                                    title="View Client"
-                                                >
-                                                    <EyeIcon className='w-4 h-4' />
-                                                </Button>
-                                                <Button 
-                                                    variant='default' 
-                                                    size='icon' 
-                                                    className='mr-2'
-                                                    onClick={() => handleEdit(client)}
-                                                    title="Edit Client"
-                                                >
-                                                    <PencilIcon className='w-4 h-4' />
-                                                </Button>
-                                                <Button 
-                                                    variant='destructive' 
-                                                    size='icon' 
-                                                    className='mr-2'
-                                                    onClick={() => handleDelete(client)}
-                                                    title="Delete Client"
-                                                >
-                                                    <TrashIcon className='w-4 h-4' />
-                                                </Button>
-                                            </TableCell>
+                                <div className='overflow-x-auto px-6'>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow className='border-b bg-muted/50 hover:bg-muted/50'>
+                                                <TableHead className='h-12 font-semibold text-sm text-foreground'>Company Name</TableHead>
+                                                <TableHead className='h-12 font-semibold text-sm text-foreground'>Supervisor</TableHead>
+                                                <TableHead className='h-12 font-semibold text-sm text-foreground'>Email</TableHead>
+                                                <TableHead className='h-12 font-semibold text-sm text-foreground'>Phone</TableHead>
+                                                <TableHead className='h-12 font-semibold text-sm text-foreground'>City</TableHead>
+                                                <TableHead className='h-12 font-semibold text-sm text-foreground'>Quotations</TableHead>
+                                                <TableHead className='h-12 font-semibold text-sm text-foreground text-right'>Actions</TableHead>
                                             </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {clients.data.map((client) => (
+                                                <TableRow key={client.id} className='border-b hover:bg-muted/30 transition-colors duration-150'>
+                                                    <TableCell className='py-4'>
+                                                        <span className='font-medium text-foreground'>{client.company_name}</span>
+                                                    </TableCell>
+                                                    <TableCell className='py-4'>
+                                                        <span className='text-sm text-muted-foreground'>{client.supervisor_name}</span>
+                                                    </TableCell>
+                                                    <TableCell className='py-4'>
+                                                        <span className='text-sm text-muted-foreground'>{client.company_email}</span>
+                                                    </TableCell>
+                                                    <TableCell className='py-4'>
+                                                        <span className='text-sm text-muted-foreground'>{client.company_phone_number}</span>
+                                                    </TableCell>
+                                                    <TableCell className='py-4'>
+                                                        <span className='text-sm text-muted-foreground'>{client.company_city}</span>
+                                                    </TableCell>
+                                                    <TableCell className='py-4'>
+                                                        <span className='text-sm font-medium text-foreground'>{client.quotations?.length || 0}</span>
+                                                    </TableCell>
+                                                    <TableCell className='py-4'>
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <Button 
+                                                                variant='ghost' 
+                                                                size='sm'
+                                                                onClick={() => handleView(client)}
+                                                                className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
+                                                                title="View Client"
+                                                            >
+                                                                <EyeIcon className='w-4 h-4' />
+                                                            </Button>
+                                                            <Button 
+                                                                variant='ghost' 
+                                                                size='sm'
+                                                                onClick={() => handleEdit(client)}
+                                                                className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
+                                                                title="Edit Client"
+                                                            >
+                                                                <PencilIcon className='w-4 h-4' />
+                                                            </Button>
+                                                            <Button 
+                                                                variant='ghost' 
+                                                                size='sm'
+                                                                onClick={() => handleDelete(client)}
+                                                                className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+                                                                title="Delete Client"
+                                                            >
+                                                                <TrashIcon className='w-4 h-4' />
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
                                 
                                 {/* Pagination */}
-                                <div className='mt-6 space-y-4'>
+                                <div className='border-t bg-muted/30 px-6 py-4'>
                                     <div className='flex flex-col sm:flex-row items-center justify-between gap-4'>
                                         <div className='flex items-center gap-2'>
                                             <span className='text-sm text-muted-foreground'>Show</span>
@@ -309,11 +345,11 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                                                 onValueChange={(value) => {
                                                     router.get(window.location.pathname, {
                                                         per_page: value,
-                                                        page: 1 // Reset to first page when changing per_page
+                                                        page: 1
                                                     }, { preserveState: true })
                                                 }}
                                             >
-                                                <SelectTrigger className='w-auto'>
+                                                <SelectTrigger className='w-20 h-8'>
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -326,7 +362,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                                             <span className='text-sm text-muted-foreground'>entries</span>
                                         </div>
                                         <div className='text-sm text-muted-foreground'>
-                                            Showing {clients.from} to {clients.to} of {clients.total} results
+                                            Showing <span className='font-medium text-foreground'>{clients.from}</span> to <span className='font-medium text-foreground'>{clients.to}</span> of <span className='font-medium text-foreground'>{clients.total}</span> results
                                         </div>
                                     </div>
                                     <div className='flex justify-center'>
@@ -407,7 +443,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
             <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>Client Details</DialogTitle>
+                        <DialogTitle className="text-2xl font-bold">Client Details</DialogTitle>
                     </DialogHeader>
                     {selectedClient && (
                         <div className="space-y-4">
@@ -457,7 +493,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
             <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>Add New Client</DialogTitle>
+                        <DialogTitle className="text-2xl font-bold">Add New Client</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={submitCreate} className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
@@ -526,7 +562,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                             >
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={isSubmitting}>
+                            <Button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
                                 {isSubmitting ? 'Creating...' : 'Create Client'}
                             </Button>
                         </DialogFooter>
@@ -538,7 +574,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
             <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>Edit Client</DialogTitle>
+                        <DialogTitle className="text-2xl font-bold">Edit Client</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={submitEdit} className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
@@ -607,7 +643,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                             >
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={isSubmitting}>
+                            <Button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
                                 {isSubmitting ? 'Updating...' : 'Update Client'}
                             </Button>
                         </DialogFooter>
@@ -619,12 +655,12 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
             <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Confirm Deletion</DialogTitle>
+                        <DialogTitle className="text-xl font-bold">Confirm Deletion</DialogTitle>
                     </DialogHeader>
-                    <Alert variant="default">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Warning</AlertTitle>
-                        <AlertDescription>
+                    <Alert variant="destructive" className="border-destructive/50 bg-destructive/10">
+                        <AlertTriangle className="h-4 w-4 text-destructive" />
+                        <AlertTitle className="font-semibold">Warning</AlertTitle>
+                        <AlertDescription className="text-sm">
                             This action cannot be undone. This will permanently delete the client and all associated data.
                         </AlertDescription>
                     </Alert>

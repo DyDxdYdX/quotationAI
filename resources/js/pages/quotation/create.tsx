@@ -8,7 +8,6 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 // Using HTML textarea since UI component doesn't exist
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -112,8 +111,8 @@ export default function CreateQuotation({ clients }: { clients: Client[] }) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Create New Quotation" />
             
-            <div className="m-4">
-                <div className="flex items-center gap-4 mb-8">
+            <div className="px-6 py-4">
+                <div className="flex items-center gap-4 mb-6">
                     <Button 
                         variant="outline" 
                         size="sm"
@@ -123,15 +122,15 @@ export default function CreateQuotation({ clients }: { clients: Client[] }) {
                         <ArrowLeft className="w-4 h-4" />
                     </Button>
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight">Create New Quotation</h1>
-                        <p className="text-muted-foreground mt-2">Generate an AI-powered quotation based on client requirements</p>
+                        <h1 className="text-3xl font-bold tracking-tight text-foreground">Create New Quotation</h1>
+                        <p className="text-muted-foreground mt-2 text-sm">Generate an AI-powered quotation based on client requirements</p>
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-8">
-                    <Card className="border-border/50">
-                        <CardHeader>
-                            <CardTitle className="text-lg font-semibold">Client Information</CardTitle>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <Card className="border shadow-sm">
+                        <CardHeader className="border-b bg-muted/30">
+                            <CardTitle className="text-xl font-bold">Client Information</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div>
@@ -222,9 +221,9 @@ export default function CreateQuotation({ clients }: { clients: Client[] }) {
                         </CardContent>
                     </Card>
 
-                    <Card className="border-border/50">
-                        <CardHeader>
-                            <CardTitle className="text-lg font-semibold">Service Requirements</CardTitle>
+                    <Card className="border shadow-sm">
+                        <CardHeader className="border-b bg-muted/30">
+                            <CardTitle className="text-xl font-bold">Service Requirements</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
@@ -276,16 +275,17 @@ export default function CreateQuotation({ clients }: { clients: Client[] }) {
                         </CardContent>
                     </Card>
 
-                    <Card className="border-border/50 bg-gradient-to-r from-background to-muted/30">
-                        <CardContent>
+                    <Card className="border shadow-sm">
+                        <CardContent className="pt-6">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                                 <div className="space-y-1">
-                                    <h4 className="font-semibold text-lg">Generate AI Quotation</h4>
+                                    <h4 className="font-bold text-lg text-foreground">Generate AI Quotation</h4>
+                                    <p className="text-sm text-muted-foreground">Click the button below to generate your quotation</p>
                                 </div>
                                 <Button 
                                     type="submit" 
                                     disabled={isGenerating}
-                                    className="gap-2 min-w-[180px] h-11"
+                                    className="gap-2 min-w-[180px] h-11 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
                                     size="lg"
                                 >
                                     {isGenerating ? (
@@ -303,12 +303,12 @@ export default function CreateQuotation({ clients }: { clients: Client[] }) {
                             </div>
 
                             {isGenerating && (
-                                <div className="mt-6 p-4 bg-blue-50/80 border border-blue-200 rounded-lg">
-                                    <div className="flex items-center gap-2 text-blue-700">
+                                <div className="mt-6 p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                                    <div className="flex items-center gap-2 text-primary">
                                         <Loader2 className="w-4 h-4 animate-spin" />
                                         <span className="text-sm font-medium">Generating quotation with AI...</span>
                                     </div>
-                                    <p className="text-xs text-blue-600 mt-1">
+                                    <p className="text-xs text-muted-foreground mt-1">
                                         Please wait while we process your request with Google Gemini API
                                     </p>
                                 </div>

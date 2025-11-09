@@ -14,7 +14,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { EyeIcon, PencilIcon, TrashIcon, PlusIcon } from 'lucide-react';
+import { EyeIcon, PencilIcon, TrashIcon, PlusIcon, FileDown, CheckCircle, XCircle, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
     Pagination, 
@@ -40,6 +40,12 @@ import { router } from '@inertiajs/react';
 import { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -75,7 +81,7 @@ interface Quotation {
     id: number;
     client_id: number;
     quotation_request_id: number;
-    quotation_message: any;
+    quotation_message: string | object;
     quotation_status: 'pending' | 'approved' | 'rejected';
     created_at: string;
     updated_at: string;
@@ -134,16 +140,6 @@ export default function Quotation({ quotations, per_page_request = '10', clients
         },
     ];
 
-    const handleCreate = () => {
-        setCreateForm({
-            client_id: '',
-            quotation_request_id: '',
-            quotation_message: '',
-            quotation_status: 'pending',
-        });
-        setCreateDialogOpen(true);
-    };
-
     const handleDelete = (quotation: Quotation) => {
         setSelectedQuotation(quotation);
         setDeleteDialogOpen(true);
@@ -184,16 +180,37 @@ export default function Quotation({ quotations, per_page_request = '10', clients
         });
     };
 
+    const handleStatusUpdate = (quotation: Quotation, status: 'approved' | 'rejected') => {
+        setIsSubmitting(true);
+        router.put(`/quotation/${quotation.id}`, {
+            quotation_status: status
+        }, {
+            onSuccess: () => {
+                // Status updated successfully
+            },
+            onFinish: () => {
+                setIsSubmitting(false);
+            }
+        });
+    };
+
+    const handleDownloadPdf = (quotation: Quotation) => {
+        // Only allow download if status is approved
+        if (quotation.quotation_status === 'approved') {
+            window.open(`/quotation/${quotation.id}/pdf`, '_blank');
+        }
+    };
+
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'pending':
-                return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100';
+                return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/50';
             case 'approved':
-                return 'bg-green-100 text-green-800 hover:bg-green-100';
+                return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/50';
             case 'rejected':
-                return 'bg-red-100 text-red-800 hover:bg-red-100';
+                return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800/50';
             default:
-                return 'bg-gray-100 text-gray-800 hover:bg-gray-100';
+                return 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800/50 dark:text-slate-300 dark:border-slate-700';
         }
     };
 
@@ -202,99 +219,183 @@ export default function Quotation({ quotations, per_page_request = '10', clients
             <Head title="Manage Quotation" />
             
             {/* Quotation Summary Cards */}
-            <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 m-4'>
-                {quotationSummary.map((summary, index) => (
-                    <Card key={index} className='bg-sidebar'>
-                        <CardHeader className='font-bold text-lg'>
-                            {summary.title}
-                        </CardHeader>
-                        <CardContent className='text-2xl font-semibold'>
-                            {summary.value}
-                        </CardContent>
-                    </Card>
-                ))}
+            <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 px-6 py-4'>
+                {quotationSummary.map((summary, index) => {
+                    const colors = [
+                        'from-blue-500 to-blue-600',
+                        'from-amber-500 to-amber-600',
+                        'from-emerald-500 to-emerald-600',
+                        'from-rose-500 to-rose-600',
+                    ];
+                    return (
+                        <Card key={index} className='border-0 shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden'>
+                            <div className={`h-1.5 bg-gradient-to-r ${colors[index % colors.length]}`} />
+                            <CardHeader className='pb-2'>
+                                <p className='text-sm font-medium text-muted-foreground uppercase tracking-wide'>
+                                    {summary.title}
+                                </p>
+                            </CardHeader>
+                            <CardContent>
+                                <p className='text-3xl font-bold text-foreground'>
+                                    {summary.value}
+                                </p>
+                            </CardContent>
+                        </Card>
+                    );
+                })}
             </div>
 
             {/* Quotation Table */}
-            <div className='m-4'>
-                <Card className='bg-sidebar'>
-                    <CardHeader className='flex flex-row items-center justify-between'>
-                        <h2 className='text-xl font-bold'>Quotations List</h2>
-                        <Button onClick={() => router.get('/quotation/create')} className='flex items-center gap-2'>
+            <div className='px-6 pb-6'>
+                <Card className='border shadow-sm'>
+                    <CardHeader className='flex flex-row items-center justify-between border-b bg-muted/30'>
+                        <div>
+                            <h2 className='text-2xl font-bold text-foreground'>Quotations</h2>
+                            <p className='text-sm text-muted-foreground mt-1'>Manage and track all quotation requests</p>
+                        </div>
+                        <Button 
+                            onClick={() => router.get('/quotation/create')} 
+                            className='flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm'
+                        >
                             <PlusIcon className='w-4 h-4' />
                             Generate New Quotation
                         </Button>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className='p-0'>
                         {!quotations?.data || quotations.data.length === 0 ? (
-                            <div className='text-center py-8 text-muted-foreground'>
-                                <p>No quotations found.</p>
+                            <div className='text-center py-16'>
+                                <div className='mx-auto w-24 h-24 rounded-full bg-muted flex items-center justify-center mb-4'>
+                                    <PlusIcon className='w-12 h-12 text-muted-foreground' />
+                                </div>
+                                <p className='text-lg font-medium text-foreground mb-2'>No quotations found</p>
+                                <p className='text-sm text-muted-foreground mb-6'>Get started by creating a new quotation</p>
+                                <Button onClick={() => router.get('/quotation/create')} className='gap-2'>
+                                    <PlusIcon className='w-4 h-4' />
+                                    Generate New Quotation
+                                </Button>
                             </div>
                         ) : (
                             <>
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className='font-bold'>Client</TableHead>
-                                            <TableHead className='font-bold'>Service Type</TableHead>
-                                            <TableHead className='font-bold'>Status</TableHead>
-                                            <TableHead className='font-bold'>Created Date</TableHead>
-                                            <TableHead className='font-bold'>Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {quotations.data.map((quotation) => (
-                                            <TableRow key={quotation.id}>
-                                                <TableCell>
-                                                    {quotation.client?.company_name || 'N/A'}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {serviceTypeLabels[quotation.quotation_request?.service_type as keyof typeof serviceTypeLabels] || 'N/A'}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge className={getStatusColor(quotation.quotation_status)}>
-                                                        {quotation.quotation_status.charAt(0).toUpperCase() + quotation.quotation_status.slice(1)}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {new Date(quotation.created_at).toLocaleDateString()}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button 
-                                                        variant='default' 
-                                                        size='icon' 
-                                                        className='mr-2'
-                                                        onClick={() => router.get(`/quotation/${quotation.id}`)}
-                                                        title="View Quotation"
-                                                    >
-                                                        <EyeIcon className='w-4 h-4' />
-                                                    </Button>
-                                                    <Button 
-                                                        variant='default' 
-                                                        size='icon' 
-                                                        className='mr-2'
-                                                        onClick={() => router.get(`/quotation/${quotation.id}/edit`)}
-                                                        title="Edit Quotation"
-                                                    >
-                                                        <PencilIcon className='w-4 h-4' />
-                                                    </Button>
-                                                    <Button 
-                                                        variant='destructive' 
-                                                        size='icon' 
-                                                        className='mr-2'
-                                                        onClick={() => handleDelete(quotation)}
-                                                        title="Delete Quotation"
-                                                    >
-                                                        <TrashIcon className='w-4 h-4' />
-                                                    </Button>
-                                                </TableCell>
+                                <div className='overflow-x-auto px-6'>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow className='border-b bg-muted/50 hover:bg-muted/50'>
+                                                <TableHead className='h-12 font-semibold text-sm text-foreground'>Client</TableHead>
+                                                <TableHead className='h-12 font-semibold text-sm text-foreground'>Service Type</TableHead>
+                                                <TableHead className='h-12 font-semibold text-sm text-foreground'>Status</TableHead>
+                                                <TableHead className='h-12 font-semibold text-sm text-foreground'>Created Date</TableHead>
+                                                <TableHead className='h-12 font-semibold text-sm text-foreground text-right'>Actions</TableHead>
                                             </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {quotations.data.map((quotation) => (
+                                                <TableRow key={quotation.id} className='border-b hover:bg-muted/30 transition-colors duration-150'>
+                                                    <TableCell className='py-4'>
+                                                        <span className='font-medium text-foreground'>{quotation.client?.company_name || 'N/A'}</span>
+                                                    </TableCell>
+                                                    <TableCell className='py-4'>
+                                                        <span className='text-sm text-muted-foreground'>{serviceTypeLabels[quotation.quotation_request?.service_type as keyof typeof serviceTypeLabels] || 'N/A'}</span>
+                                                    </TableCell>
+                                                    <TableCell className='py-4'>
+                                                        <Badge className={`${getStatusColor(quotation.quotation_status)} text-xs font-semibold px-3 py-1 border`}>
+                                                            {quotation.quotation_status.charAt(0).toUpperCase() + quotation.quotation_status.slice(1)}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className='py-4'>
+                                                        <span className='text-sm text-muted-foreground'>{new Date(quotation.created_at).toLocaleDateString()}</span>
+                                                    </TableCell>
+                                                    <TableCell className='py-4'>
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <Button 
+                                                                variant='ghost' 
+                                                                size='sm'
+                                                                onClick={() => router.get(`/quotation/${quotation.id}`)}
+                                                                className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
+                                                                title="View quotation"
+                                                            >
+                                                                <EyeIcon className='w-4 h-4' />
+                                                            </Button>
+                                                            <Button 
+                                                                variant='ghost' 
+                                                                size='sm'
+                                                                onClick={() => router.get(`/quotation/${quotation.id}/edit`)}
+                                                                className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
+                                                                title="Edit quotation"
+                                                            >
+                                                                <PencilIcon className='w-4 h-4' />
+                                                            </Button>
+                                                            <Button 
+                                                                variant='ghost' 
+                                                                size='sm'
+                                                                onClick={() => handleDownloadPdf(quotation)}
+                                                                disabled={quotation.quotation_status !== 'approved' || isSubmitting}
+                                                                className={`h-8 w-8 p-0 ${
+                                                                    quotation.quotation_status === 'approved' 
+                                                                        ? 'hover:bg-primary/10 hover:text-primary' 
+                                                                        : 'text-muted-foreground/30 cursor-not-allowed'
+                                                                }`}
+                                                                title={quotation.quotation_status === 'approved' ? "Download PDF" : "PDF available only for approved quotations"}
+                                                            >
+                                                                <FileDown className='w-4 h-4' />
+                                                            </Button>
+                                                            {quotation.quotation_status !== 'approved' && (
+                                                                <Button 
+                                                                    variant='ghost' 
+                                                                    size='sm'
+                                                                    onClick={() => handleStatusUpdate(quotation, 'approved')}
+                                                                    disabled={isSubmitting}
+                                                                    className='h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-500 dark:hover:bg-emerald-950/30'
+                                                                    title="Approve quotation"
+                                                                >
+                                                                    <CheckCircle className='w-4 h-4' />
+                                                                </Button>
+                                                            )}
+                                                            {quotation.quotation_status !== 'rejected' && (
+                                                                <Button 
+                                                                    variant='ghost' 
+                                                                    size='sm'
+                                                                    onClick={() => handleStatusUpdate(quotation, 'rejected')}
+                                                                    disabled={isSubmitting}
+                                                                    className='h-8 w-8 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:text-rose-500 dark:hover:bg-rose-950/30'
+                                                                    title="Reject quotation"
+                                                                >
+                                                                    <XCircle className='w-4 h-4' />
+                                                                </Button>
+                                                            )}
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button 
+                                                                        variant='ghost' 
+                                                                        size='sm'
+                                                                        className="h-8 w-8 p-0 hover:bg-muted"
+                                                                        title="More actions"
+                                                                    >
+                                                                        <MoreVertical className='w-4 h-4' />
+                                                                        <span className="sr-only">More actions</span>
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end" className="w-48">
+                                                                    <DropdownMenuItem
+                                                                        onClick={() => handleDelete(quotation)}
+                                                                        disabled={isSubmitting}
+                                                                        variant="destructive"
+                                                                        className="gap-2"
+                                                                    >
+                                                                        <TrashIcon className='w-4 h-4' />
+                                                                        Delete Quotation
+                                                                    </DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
                                 
                                 {/* Pagination */}
-                                <div className='mt-6 space-y-4'>
+                                <div className='border-t bg-muted/30 px-6 py-4'>
                                     <div className='flex flex-col sm:flex-row items-center justify-between gap-4'>
                                         <div className='flex items-center gap-2'>
                                             <span className='text-sm text-muted-foreground'>Show</span>
@@ -307,7 +408,7 @@ export default function Quotation({ quotations, per_page_request = '10', clients
                                                     }, { preserveState: true })
                                                 }}
                                             >
-                                                <SelectTrigger className='w-auto'>
+                                                <SelectTrigger className='w-20 h-8'>
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -320,7 +421,7 @@ export default function Quotation({ quotations, per_page_request = '10', clients
                                             <span className='text-sm text-muted-foreground'>entries</span>
                                         </div>
                                         <div className='text-sm text-muted-foreground'>
-                                            Showing {quotations?.from || 0} to {quotations?.to || 0} of {quotations?.total || 0} results
+                                            Showing <span className='font-medium text-foreground'>{quotations?.from || 0}</span> to <span className='font-medium text-foreground'>{quotations?.to || 0}</span> of <span className='font-medium text-foreground'>{quotations?.total || 0}</span> results
                                         </div>
                                     </div>
                                     <div className='flex justify-center'>
@@ -401,7 +502,7 @@ export default function Quotation({ quotations, per_page_request = '10', clients
             <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>Add New Quotation</DialogTitle>
+                        <DialogTitle className="text-2xl font-bold">Add New Quotation</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={submitCreate} className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
@@ -492,12 +593,12 @@ export default function Quotation({ quotations, per_page_request = '10', clients
             <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Confirm Deletion</DialogTitle>
+                        <DialogTitle className="text-xl font-bold">Confirm Deletion</DialogTitle>
                     </DialogHeader>
-                    <Alert variant="default">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Warning</AlertTitle>
-                        <AlertDescription>
+                    <Alert variant="destructive" className="border-destructive/50 bg-destructive/10">
+                        <AlertTriangle className="h-4 w-4 text-destructive" />
+                        <AlertTitle className="font-semibold">Warning</AlertTitle>
+                        <AlertDescription className="text-sm">
                             This action cannot be undone. This will permanently delete the quotation.
                         </AlertDescription>
                     </Alert>

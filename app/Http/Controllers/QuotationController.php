@@ -8,6 +8,7 @@ use App\Models\QuotationRequest;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\GeminiController;
 
 class QuotationController extends Controller
@@ -129,7 +130,8 @@ class QuotationController extends Controller
             return redirect()->route('manage-quotation')->with('success', 'AI-powered quotation generated successfully!');
 
         } catch (\Exception $e) {
-            return back()->withErrors(['error' => 'Failed to generate quotation: ' . $e->getMessage()]);
+            Log::error('Quotation generation failed: ' . $e->getMessage());
+            return back()->withErrors(['error' => 'Failed to generate quotation. Please try again. Error: ' . $e->getMessage()]);
         }
     }
 
@@ -153,13 +155,9 @@ class QuotationController extends Controller
     public function edit(Quotation $quotation)
     {
         $quotation->load(['client', 'quotationRequest']);
-        $clients = Client::orderBy('company_name')->get();
-        $quotationRequests = QuotationRequest::orderBy('service_type')->get();
         
         return Inertia::render('quotation/edit', [
             'quotation' => $quotation,
-            'clients' => $clients,
-            'quotation_requests' => $quotationRequests,
         ]);
     }
 
@@ -178,8 +176,22 @@ class QuotationController extends Controller
             $quotation->update($validated);
 
             return redirect()->back()->with('success', 'Quotation status updated successfully.');
+        } elseif ($request->has('quotation_message') && $request->has('quotation_status')) {
+            // Update from edit page - only quotation message and status (client and service requirements are read-only)
+            $validated = $request->validate([
+                'quotation_message' => 'required|string',
+                'quotation_status' => ['required', Rule::in(['pending', 'approved', 'rejected'])],
+            ]);
+
+            // Update quotation (client and service requirements cannot be changed)
+            $quotation->update([
+                'quotation_message' => $validated['quotation_message'],
+                'quotation_status' => $validated['quotation_status'],
+            ]);
+
+            return redirect()->route('manage-quotation')->with('success', 'Quotation updated successfully.');
         } else {
-            // Full form update from edit page
+            // Full form update (for backward compatibility or admin use)
             $validated = $request->validate([
                 'client_id' => 'required|exists:clients,id',
                 'service_type' => ['required', Rule::in(['web_development', 'mobile_development', 'desktop_development', 'ai_development', 'graphic_design', 'digital_marketing', 'other'])],
@@ -199,8 +211,7 @@ class QuotationController extends Controller
             // Update quotation request if it exists
             if ($quotation->quotationRequest) {
                 $quotation->quotationRequest->update(['service_type' => $validated['service_type']]);
-                $quotation->quotationRequest->updateRequestFields($validated['problem'],$validated['solution']
-                );
+                $quotation->quotationRequest->updateRequestFields($validated['problem'], $validated['solution']);
             }
 
             return redirect()->route('manage-quotation')->with('success', 'Quotation updated successfully.');

@@ -13,7 +13,7 @@ import { router } from '@inertiajs/react';
 import { useState } from 'react';
 import { ArrowLeft, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import QuotationRenderer from '@/components/quotation-renderer';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -46,7 +46,7 @@ interface Quotation {
     id: number;
     client_id: number;
     quotation_request_id: number;
-    quotation_message: any;
+    quotation_message: string | object;
     quotation_status: 'pending' | 'approved' | 'rejected';
     created_at: string;
     updated_at: string;
@@ -84,13 +84,13 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'pending':
-                return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100';
+                return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/50';
             case 'approved':
-                return 'bg-green-100 text-green-800 hover:bg-green-100';
+                return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/50';
             case 'rejected':
-                return 'bg-red-100 text-red-800 hover:bg-red-100';
+                return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800/50';
             default:
-                return 'bg-gray-100 text-gray-800 hover:bg-gray-100';
+                return 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800/50 dark:text-slate-300 dark:border-slate-700';
         }
     };
 
@@ -98,8 +98,8 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`View Quotation #${quotation.id}`} />
             
-            <div className="m-4">
-                <div className="flex items-center gap-4 mb-8">
+            <div className="px-6 py-4">
+                <div className="flex items-center gap-4 mb-6">
                     <Button 
                         variant="outline" 
                         size="sm"
@@ -110,19 +110,19 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
                     </Button>
                     <div className="flex-1">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-3xl font-bold tracking-tight">Quotation #{quotation.id}</h1>
-                            <Badge className={getStatusColor(quotation.quotation_status)}>
+                            <h1 className="text-3xl font-bold tracking-tight text-foreground">Quotation #{quotation.id}</h1>
+                            <Badge className={`${getStatusColor(quotation.quotation_status)} text-xs font-semibold px-3 py-1 border`}>
                                 {quotation.quotation_status.charAt(0).toUpperCase() + quotation.quotation_status.slice(1)}
                             </Badge>
                         </div>
-                        <p className="text-muted-foreground mt-2">View quotation details and manage status</p>
+                        <p className="text-muted-foreground mt-2 text-sm">View quotation details and manage status</p>
                     </div>
                 </div>
 
-                <div className="space-y-8">
-                    <Card className="border-border/50">
-                        <CardHeader>
-                            <CardTitle className="text-lg font-semibold">Client Information</CardTitle>
+                <div className="space-y-6">
+                    <Card className="border shadow-sm">
+                        <CardHeader className="border-b bg-muted/30">
+                            <CardTitle className="text-xl font-bold">Client Information</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             {quotation.client && (
@@ -151,9 +151,9 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
                         </CardContent>
                     </Card>
 
-                    <Card className="border-border/50">
-                        <CardHeader>
-                            <CardTitle className="text-lg font-semibold">Service Requirements</CardTitle>
+                    <Card className="border shadow-sm">
+                        <CardHeader className="border-b bg-muted/30">
+                            <CardTitle className="text-xl font-bold">Service Requirements</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="space-y-2">
@@ -185,9 +185,9 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
                         </CardContent>
                     </Card>
 
-                    <Card className="border-border/50">
-                        <CardHeader>
-                            <CardTitle className="text-lg font-semibold">AI Generated Quotation</CardTitle>
+                    <Card className="border shadow-sm">
+                        <CardHeader className="border-b bg-muted/30">
+                            <CardTitle className="text-xl font-bold">AI Generated Quotation</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-4">
@@ -195,108 +195,27 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
                                 
                                 {(() => {
                                     try {
+                                        // Parse quotation data - QuotationRenderer will detect format automatically
                                         const quotationData = typeof quotation.quotation_message === 'string' 
                                             ? JSON.parse(quotation.quotation_message)
                                             : quotation.quotation_message;
                                         
-                                        return (
-                                            <div className="space-y-4">
-                                                {/* Project Overview */}
-                                                {quotationData.project_overview && (
-                                                    <div className="border rounded-lg p-4">
-                                                        <h4 className="font-semibold text-sm mb-2">Project Overview</h4>
-                                                        <p className="text-sm text-muted-foreground">{quotationData.project_overview}</p>
-                                                    </div>
-                                                )}
-
-                                                {/* Timeline */}
-                                                {quotationData.timeline && (
-                                                    <div className="border rounded-lg p-4">
-                                                        <h4 className="font-semibold text-sm mb-2">Timeline</h4>
-                                                        <p className="text-sm text-muted-foreground">{quotationData.timeline}</p>
-                                                    </div>
-                                                )}
-
-                                                {/* Cost Breakdown */}
-                                                {quotationData.cost_breakdown && (
-                                                    <div className="border rounded-lg p-4">
-                                                        <h4 className="font-semibold text-sm mb-3">Cost Breakdown</h4>
-                                                        <div className="overflow-x-auto">
-                                                            <table className="w-full text-sm">
-                                                                <thead>
-                                                                    <tr className="border-b">
-                                                                        <th className="text-left py-2 px-3 font-medium">Item</th>
-                                                                        <th className="text-right py-2 px-3 font-medium">Cost</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    {Object.entries(quotationData.cost_breakdown).map(([key, value]) => (
-                                                                        <tr key={key} className="border-b border-muted">
-                                                                            <td className="py-2 px-3 capitalize">{key.replace(/_/g, ' ')}</td>
-                                                                            <td className="py-2 px-3 text-right font-medium">{String(value)}</td>
-                                                                        </tr>
-                                                                    ))}
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {/* Deliverables */}
-                                                {quotationData.deliverables && Array.isArray(quotationData.deliverables) && (
-                                                    <div className="border rounded-lg p-4">
-                                                        <h4 className="font-semibold text-sm mb-3">Deliverables</h4>
-                                                        <ul className="space-y-1 text-sm text-muted-foreground">
-                                                            {quotationData.deliverables.map((item: string, index: number) => (
-                                                                <li key={index} className="flex items-start gap-2">
-                                                                    <span className="text-primary mt-1">•</span>
-                                                                    <span>{item}</span>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    </div>
-                                                )}
-
-                                                {/* Payment Terms */}
-                                                {quotationData.payment_terms && (
-                                                    <div className="border rounded-lg p-4">
-                                                        <h4 className="font-semibold text-sm mb-2">Payment Terms</h4>
-                                                        <p className="text-sm text-muted-foreground">{quotationData.payment_terms}</p>
-                                                    </div>
-                                                )}
-
-                                                {/* Support */}
-                                                {quotationData.support && (
-                                                    <div className="border rounded-lg p-4">
-                                                        <h4 className="font-semibold text-sm mb-2">Support & Maintenance</h4>
-                                                        <p className="text-sm text-muted-foreground">{quotationData.support}</p>
-                                                    </div>
-                                                )}
-
-                                                {/* AI Generated Badge */}
-                                                {quotationData.ai_generated && (
-                                                    <div className="border rounded-lg p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
-                                                            <span className="text-xs font-medium text-blue-700">AI Generated Quotation</span>
-                                                        </div>
-                                                        {quotationData.generated_at && (
-                                                            <p className="text-xs text-blue-600 mt-1">
-                                                                Generated: {new Date(quotationData.generated_at).toLocaleString()}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
+                                        return <QuotationRenderer quotationData={quotationData} />;
                                     } catch (error) {
+                                        console.error('Error parsing quotation data:', error);
                                         // Fallback for non-JSON data
                                         return (
-                                            <div className="p-4 bg-muted/50 rounded-md text-sm whitespace-pre-wrap">
-                                                {typeof quotation.quotation_message === 'string' 
-                                                    ? quotation.quotation_message 
-                                                    : JSON.stringify(quotation.quotation_message, null, 2)
-                                                }
+                                            <div className="space-y-4">
+                                                <div className="p-4 bg-red-50 border border-red-200 rounded-md">
+                                                    <p className="text-sm text-red-800 font-medium mb-2">Error parsing quotation data</p>
+                                                    <p className="text-xs text-red-600">The quotation data could not be parsed properly. Displaying raw content below.</p>
+                                                </div>
+                                                <div className="p-4 bg-muted/50 rounded-md text-sm whitespace-pre-wrap max-h-96 overflow-y-auto">
+                                                    {typeof quotation.quotation_message === 'string' 
+                                                        ? quotation.quotation_message 
+                                                        : JSON.stringify(quotation.quotation_message, null, 2)
+                                                    }
+                                                </div>
                                             </div>
                                         );
                                     }
@@ -317,17 +236,19 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
                     </Card>
 
                     {/* Status Management */}
-                    <Card className="border-border/50 bg-gradient-to-r from-background to-muted/30">
-                        <CardContent>
+                    <Card className="border shadow-sm">
+                        <CardContent className="pt-6">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                                 <div className="space-y-1">
-                                    <h4 className="font-semibold text-lg">Quotation Status</h4>
+                                    <h4 className="font-bold text-lg text-foreground">Quotation Status</h4>
+                                    <p className="text-sm text-muted-foreground">Manage quotation status and download PDF</p>
                                 </div>
-                                <div className="flex gap-3">
+                                <div className="flex flex-wrap gap-2">
                                     <Button 
                                         onClick={() => window.open(`/quotation/${quotation.id}/pdf`, '_blank')}
                                         variant="outline"
-                                        className="gap-2"
+                                        className="gap-2 hover:bg-primary/10 hover:text-primary"
+                                        disabled={quotation.quotation_status !== 'approved'}
                                     >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -339,7 +260,7 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
                                         <Button 
                                             onClick={() => handleStatusUpdate('approved')}
                                             disabled={isUpdating}
-                                            className="gap-2 bg-green-600 hover:bg-green-700"
+                                            className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
                                         >
                                             {isUpdating ? (
                                                 <Loader2 className="w-4 h-4 animate-spin" />

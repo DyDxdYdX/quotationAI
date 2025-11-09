@@ -3,9 +3,9 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, usePage } from '@inertiajs/react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, LabelList, Legend } from 'recharts';
 import { Calendar, Clock, TrendingUp, Users, FileText, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -101,39 +101,135 @@ export default function Dashboard() {
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'pending':
-                return 'text-amber-600 bg-amber-50 border-amber-200';
+                return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/50';
             case 'approved':
-                return 'text-green-600 bg-green-50 border-green-200';
+                return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/50';
             case 'rejected':
-                return 'text-red-600 bg-red-50 border-red-200';
+                return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800/50';
             default:
-                return 'text-gray-600 bg-gray-50 border-gray-200';
+                return 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800/50 dark:text-slate-300 dark:border-slate-700';
         }
+    };
+
+    // Calculate total for percentage calculation
+    const getTotalValue = (data: Array<{ value: number }>) => {
+        return data.reduce((sum, item) => sum + item.value, 0);
+    };
+
+    // Function to get computed CSS variable value
+    const getCSSVariableValue = (variable: string): string => {
+        if (typeof window === 'undefined') {
+            // Fallback for SSR - use default colors
+            const defaultColors: Record<string, string> = {
+                'chart-1': '#3b82f6',
+                'chart-2': '#8b5cf6',
+                'chart-3': '#10b981',
+                'chart-4': '#f59e0b',
+                'chart-5': '#ef4444',
+            };
+            const match = variable.match(/var\(--([^)]+)\)/);
+            if (match && defaultColors[match[1]]) {
+                return defaultColors[match[1]];
+            }
+            return variable;
+        }
+        
+        // Extract the variable name from hsl(var(--chart-1)) or var(--chart-1) format
+        const match = variable.match(/var\(--([^)]+)\)/);
+        if (!match) {
+            // If it's already a valid color (hex, rgb, etc.), return it
+            return variable;
+        }
+        
+        const varName = match[1];
+        const computedValue = getComputedStyle(document.documentElement)
+            .getPropertyValue(`--${varName}`)
+            .trim();
+        
+        // CSS variables from the theme are hex values like #3b82f6
+        if (computedValue) {
+            return computedValue;
+        }
+        
+        // Fallback to default colors if CSS variable not found
+        const defaultColors: Record<string, string> = {
+            'chart-1': '#3b82f6',
+            'chart-2': '#8b5cf6',
+            'chart-3': '#10b981',
+            'chart-4': '#f59e0b',
+            'chart-5': '#ef4444',
+        };
+        
+        return defaultColors[varName] || variable;
+    };
+
+    // Transform chart data to use computed colors
+    const transformChartData = (data: Array<{ name: string; value: number; fill: string }>) => {
+        return data.map(item => ({
+            ...item,
+            fill: getCSSVariableValue(item.fill)
+        }));
+    };
+
+    const quotationsByStatusData = transformChartData(chartData.quotationsByStatus);
+    const serviceTypesData = transformChartData(chartData.serviceTypesData);
+    
+    // Get computed CSS variable value helper
+    const getCSSVar = (varName: string, fallback: string): string => {
+        if (typeof window === 'undefined') return fallback;
+        const value = getComputedStyle(document.documentElement)
+            .getPropertyValue(`--${varName}`)
+            .trim();
+        return value || fallback;
+    };
+    
+    // Get colors for charts
+    const primaryColor = getCSSVar('primary', '#3b82f6');
+    const foregroundColor = getCSSVar('foreground', '#0f172a');
+    const mutedForegroundColor = getCSSVar('muted-foreground', '#64748b');
+    const borderColor = getCSSVar('border', '#e2e8f0');
+    
+    const quotationsTotal = getTotalValue(chartData.quotationsByStatus);
+    const serviceTypesTotal = getTotalValue(chartData.serviceTypesData);
+
+    // Custom label function for pie charts - show value and percentage
+    const createPieLabelFunction = (total: number) => (entry: any) => {
+        if (total === 0 || !entry.value) return '';
+        const percentage = ((entry.value / total) * 100).toFixed(1);
+        // Only show label if slice is large enough (>5% of total) to avoid clutter
+        if (parseFloat(percentage) > 5) {
+            return `${entry.value} (${percentage}%)`;
+        }
+        return '';
     };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
-            <div className="flex h-full flex-1 flex-col gap-6 p-6">
+            <div className="flex h-full flex-1 flex-col gap-6 px-6 py-4">
                 {/* Date and Time Section */}
-                <div className="grid gap-4 md:grid-cols-2">
-                    <Card>
+                <div className="grid gap-6 md:grid-cols-2">
+                    <Card className="border shadow-sm">
                         <CardContent className="p-6">
                             <div className="flex items-center gap-4">
-                                <Calendar className="h-8 w-8 text-blue-500" />
+                                <div className="p-3 rounded-lg bg-primary/10">
+                                    <Calendar className="h-6 w-6 text-primary" />
+                                </div>
                                 <div>
-                                    <p className="text-2xl font-bold">{formatDate(currentTime)}</p>
+                                    <p className="text-2xl font-bold text-foreground">{formatDate(currentTime)}</p>
                                     <p className="text-sm text-muted-foreground">Today's Date</p>
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
-                    <Card>
+                    <Card className="border shadow-sm">
                         <CardContent className="p-6">
                             <div className="flex items-center gap-4">
-                                <Clock className="h-8 w-8 text-green-500" />
+                                <div className="p-3 rounded-lg bg-emerald-500/10">
+                                    <Clock className="h-6 w-6 text-emerald-600" />
+                                </div>
                                 <div>
-                                    <p className="text-2xl font-bold font-mono">{formatTime(currentTime)}</p>
+                                    <p className="text-2xl font-bold font-mono text-foreground">{formatTime(currentTime)}</p>
                                     <p className="text-sm text-muted-foreground">Current Time</p>
                                 </div>
                             </div>
@@ -142,47 +238,59 @@ export default function Dashboard() {
                 </div>
 
                 {/* Analytics Cards */}
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <Card>
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                    <Card className="border-0 shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
+                        <div className="h-1.5 bg-gradient-to-r from-blue-500 to-blue-600" />
                         <CardContent className="p-6">
                             <div className="flex items-center gap-4">
-                                <Users className="h-8 w-8 text-blue-500" />
+                                <div className="p-3 rounded-lg bg-blue-500/10">
+                                    <Users className="h-6 w-6 text-blue-600" />
+                                </div>
                                 <div>
-                                    <p className="text-2xl font-bold">{analytics.totalClients}</p>
-                                    <p className="text-sm text-muted-foreground">Total Clients</p>
+                                    <p className="text-3xl font-bold text-foreground">{analytics.totalClients}</p>
+                                    <p className="text-sm text-muted-foreground uppercase tracking-wide">Total Clients</p>
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
-                    <Card>
+                    <Card className="border-0 shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
+                        <div className="h-1.5 bg-gradient-to-r from-emerald-500 to-emerald-600" />
                         <CardContent className="p-6">
                             <div className="flex items-center gap-4">
-                                <FileText className="h-8 w-8 text-green-500" />
+                                <div className="p-3 rounded-lg bg-emerald-500/10">
+                                    <FileText className="h-6 w-6 text-emerald-600" />
+                                </div>
                                 <div>
-                                    <p className="text-2xl font-bold">{analytics.totalQuotations}</p>
-                                    <p className="text-sm text-muted-foreground">Total Quotations</p>
+                                    <p className="text-3xl font-bold text-foreground">{analytics.totalQuotations}</p>
+                                    <p className="text-sm text-muted-foreground uppercase tracking-wide">Total Quotations</p>
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
-                    <Card>
+                    <Card className="border-0 shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
+                        <div className="h-1.5 bg-gradient-to-r from-purple-500 to-purple-600" />
                         <CardContent className="p-6">
                             <div className="flex items-center gap-4">
-                                <TrendingUp className="h-8 w-8 text-purple-500" />
+                                <div className="p-3 rounded-lg bg-purple-500/10">
+                                    <TrendingUp className="h-6 w-6 text-purple-600" />
+                                </div>
                                 <div>
-                                    <p className="text-2xl font-bold">{analytics.totalQuotationRequests}</p>
-                                    <p className="text-sm text-muted-foreground">Total Requests</p>
+                                    <p className="text-3xl font-bold text-foreground">{analytics.totalQuotationRequests}</p>
+                                    <p className="text-sm text-muted-foreground uppercase tracking-wide">Total Requests</p>
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
-                    <Card>
+                    <Card className="border-0 shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
+                        <div className="h-1.5 bg-gradient-to-r from-amber-500 to-amber-600" />
                         <CardContent className="p-6">
                             <div className="flex items-center gap-4">
-                                <AlertCircle className="h-8 w-8 text-amber-500" />
+                                <div className="p-3 rounded-lg bg-amber-500/10">
+                                    <AlertCircle className="h-6 w-6 text-amber-600" />
+                                </div>
                                 <div>
-                                    <p className="text-2xl font-bold">{analytics.pendingQuotations}</p>
-                                    <p className="text-sm text-muted-foreground">Pending Quotations</p>
+                                    <p className="text-3xl font-bold text-foreground">{analytics.pendingQuotations}</p>
+                                    <p className="text-sm text-muted-foreground uppercase tracking-wide">Pending Quotations</p>
                                 </div>
                             </div>
                         </CardContent>
@@ -192,56 +300,86 @@ export default function Dashboard() {
                 {/* Charts Section */}
                 <div className="grid gap-6 md:grid-cols-2">
                     {/* Quotations by Status - Pie Chart */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Quotations by Status</CardTitle>
-                            <CardDescription>Distribution of quotation statuses</CardDescription>
+                    <Card className="border shadow-sm">
+                        <CardHeader className="border-b bg-muted/30">
+                            <CardTitle className="text-xl font-bold">Quotations by Status</CardTitle>
+                            <CardDescription className="text-sm text-muted-foreground">Distribution of quotation statuses</CardDescription>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="pt-6">
                             <ChartContainer config={chartConfig} className="h-[300px]">
                                 <PieChart>
                                     <ChartTooltip content={<ChartTooltipContent />} />
                                     <Pie
-                                        data={chartData.quotationsByStatus}
+                                        data={quotationsByStatusData}
                                         dataKey="value"
                                         nameKey="name"
                                         cx="50%"
-                                        cy="50%"
-                                        outerRadius={80}
-                                        label={({ name, value }) => `${name}: ${value}`}
+                                        cy="40%"
+                                        outerRadius={65}
+                                        label={createPieLabelFunction(quotationsTotal)}
+                                        labelLine={{ strokeWidth: 2 }}
                                     >
-                                        {chartData.quotationsByStatus.map((entry, index) => (
+                                        {quotationsByStatusData.map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={entry.fill} />
                                         ))}
                                     </Pie>
+                                    <Legend 
+                                        verticalAlign="bottom" 
+                                        height={60}
+                                        wrapperStyle={{ paddingTop: '20px' }}
+                                        formatter={(value, entry: any) => {
+                                            const percentage = quotationsTotal > 0 ? ((entry.payload.value / quotationsTotal) * 100).toFixed(1) : '0';
+                                            return (
+                                                <span style={{ color: 'hsl(var(--foreground))', fontSize: '13px', fontWeight: '500' }}>
+                                                    <span style={{ color: entry.color, marginRight: '8px' }}>●</span>
+                                                    {value}: <strong>{entry.payload.value}</strong> ({percentage}%)
+                                                </span>
+                                            );
+                                        }}
+                                    />
                                 </PieChart>
                             </ChartContainer>
                         </CardContent>
                     </Card>
 
                     {/* Service Types Distribution */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Service Types</CardTitle>
-                            <CardDescription>Distribution of service requests by type</CardDescription>
+                    <Card className="border shadow-sm">
+                        <CardHeader className="border-b bg-muted/30">
+                            <CardTitle className="text-xl font-bold">Service Types</CardTitle>
+                            <CardDescription className="text-sm text-muted-foreground">Distribution of service requests by type</CardDescription>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="pt-6">
                             <ChartContainer config={chartConfig} className="h-[300px]">
                                 <PieChart>
                                     <ChartTooltip content={<ChartTooltipContent />} />
                                     <Pie
-                                        data={chartData.serviceTypesData}
+                                        data={serviceTypesData}
                                         dataKey="value"
                                         nameKey="name"
                                         cx="50%"
-                                        cy="50%"
-                                        outerRadius={80}
-                                        label={({ name, value }) => `${name}: ${value}`}
+                                        cy="40%"
+                                        outerRadius={65}
+                                        label={createPieLabelFunction(serviceTypesTotal)}
+                                        labelLine={{ strokeWidth: 2 }}
                                     >
-                                        {chartData.serviceTypesData.map((entry: any, index: number) => (
+                                        {serviceTypesData.map((entry: { name: string; value: number; fill: string }, index: number) => (
                                             <Cell key={`cell-${index}`} fill={entry.fill} />
                                         ))}
                                     </Pie>
+                                    <Legend 
+                                        verticalAlign="bottom" 
+                                        height={60}
+                                        wrapperStyle={{ paddingTop: '20px' }}
+                                        formatter={(value, entry: any) => {
+                                            const percentage = serviceTypesTotal > 0 ? ((entry.payload.value / serviceTypesTotal) * 100).toFixed(1) : '0';
+                                            return (
+                                                <span style={{ color: 'hsl(var(--foreground))', fontSize: '13px', fontWeight: '500' }}>
+                                                    <span style={{ color: entry.color, marginRight: '8px' }}>●</span>
+                                                    {value}: <strong>{entry.payload.value}</strong> ({percentage}%)
+                                                </span>
+                                            );
+                                        }}
+                                    />
                                 </PieChart>
                             </ChartContainer>
                         </CardContent>
@@ -249,45 +387,58 @@ export default function Dashboard() {
                 </div>
 
                 {/* Monthly Trend - Bar Chart */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Monthly Quotations Trend</CardTitle>
-                        <CardDescription>Quotations created over the last 6 months</CardDescription>
+                <Card className="border shadow-sm">
+                    <CardHeader className="border-b bg-muted/30">
+                        <CardTitle className="text-xl font-bold">Monthly Quotations Trend</CardTitle>
+                        <CardDescription className="text-sm text-muted-foreground">Quotations created over the last 6 months</CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pt-6">
                         <ChartContainer config={chartConfig} className="h-[400px]">
                             <BarChart data={chartData.monthlyData}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="month" />
-                                <YAxis />
+                                <CartesianGrid strokeDasharray="3 3" stroke={borderColor} />
+                                <XAxis dataKey="month" stroke={mutedForegroundColor} />
+                                <YAxis stroke={mutedForegroundColor} />
                                 <ChartTooltip content={<ChartTooltipContent />} />
-                                <Bar dataKey="quotations" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="quotations" fill={primaryColor} radius={[4, 4, 0, 0]}>
+                                    <LabelList 
+                                        dataKey="quotations" 
+                                        position="top" 
+                                        fill={foregroundColor}
+                                        style={{ fontSize: '12px', fontWeight: '500' }}
+                                    />
+                                </Bar>
                             </BarChart>
                         </ChartContainer>
                     </CardContent>
                 </Card>
 
                 {/* Recent Quotations */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Recent Quotations</CardTitle>
-                        <CardDescription>Latest quotation activities</CardDescription>
+                <Card className="border shadow-sm">
+                    <CardHeader className="border-b bg-muted/30">
+                        <CardTitle className="text-xl font-bold">Recent Quotations</CardTitle>
+                        <CardDescription className="text-sm text-muted-foreground">Latest quotation activities</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {recentQuotations.map((quotation: any) => (
-                                <div key={quotation.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <CardContent className="pt-6">
+                        <div className="space-y-3">
+                            {recentQuotations.map((quotation: {
+                                id: number;
+                                quotation_status: string;
+                                created_at: string;
+                                client?: { company_name: string };
+                                quotationRequest?: { service_type: string };
+                            }) => (
+                                <div key={quotation.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30 transition-colors">
                                     <div className="flex items-center gap-3">
                                         {getStatusIcon(quotation.quotation_status)}
                                         <div>
-                                            <p className="font-medium">{quotation.client?.company_name || 'Unknown Client'}</p>
+                                            <p className="font-medium text-foreground">{quotation.client?.company_name || 'Unknown Client'}</p>
                                             <p className="text-sm text-muted-foreground">
                                                 {quotation.quotationRequest?.service_type.replace('_', ' ') || 'Unknown Service'}
                                             </p>
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(quotation.quotation_status)}`}>
+                                        <span className={`px-3 py-1 rounded-md text-xs font-semibold border ${getStatusColor(quotation.quotation_status)}`}>
                                             {quotation.quotation_status.charAt(0).toUpperCase() + quotation.quotation_status.slice(1)}
                                         </span>
                                         <p className="text-xs text-muted-foreground mt-1">

@@ -21,7 +21,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { AlertTriangle, CheckCircle, EyeIcon, FileDown, MoreVertical, PencilIcon, PlusIcon, SearchIcon, TrashIcon, X, XCircle } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -60,6 +60,8 @@ interface Quotation {
     quotation_request_id: number;
     quotation_message: string | object;
     quotation_status: 'pending' | 'approved' | 'rejected';
+    start_date?: string | null;
+    end_date?: string | null;
     created_at: string;
     updated_at: string;
     client?: Client;
@@ -285,19 +287,19 @@ export default function Quotation({
                         <div className="border-b px-4 py-4">
                             <form onSubmit={handleSearch} className="flex gap-2">
                                 <div className="relative flex-1">
-                                    <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <SearchIcon className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                     <Input
                                         type="text"
                                         placeholder="Search quotations by ID, client name, service type, or status..."
                                         value={searchInput}
                                         onChange={(e) => setSearchInput(e.target.value)}
-                                        className="pl-9 pr-9"
+                                        className="pr-9 pl-9"
                                     />
                                     {searchInput && (
                                         <button
                                             type="button"
                                             onClick={handleClearSearch}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                            className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                                         >
                                             <X className="h-4 w-4" />
                                         </button>
@@ -315,7 +317,8 @@ export default function Quotation({
                             </form>
                             {search && quotations && (
                                 <p className="mt-2 text-sm text-muted-foreground">
-                                    Showing results for: <span className="font-medium text-foreground">&quot;{search}&quot;</span> ({quotations.total} {quotations.total === 1 ? 'result' : 'results'})
+                                    Showing results for: <span className="font-medium text-foreground">&quot;{search}&quot;</span> ({quotations.total}{' '}
+                                    {quotations.total === 1 ? 'result' : 'results'})
                                 </p>
                             )}
                         </div>

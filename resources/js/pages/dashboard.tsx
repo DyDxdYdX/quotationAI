@@ -189,40 +189,42 @@ export default function Dashboard() {
     const serviceTypesTotal = getTotalValue(chartData.serviceTypesData);
 
     // Custom label function for pie charts - show value and percentage
-    const createPieLabelFunction = (total: number) => (props: {
-        value?: number;
-        cx?: number;
-        cy?: number;
-        midAngle?: number;
-        innerRadius?: number;
-        outerRadius?: number;
-        [key: string]: unknown;
-    }) => {
-        const { value, cx, cy, midAngle, innerRadius, outerRadius } = props;
-        if (!value || total === 0) return null;
-        const percentage = ((value / total) * 100).toFixed(1);
-        // Only show label if slice is large enough (>5% of total) to avoid clutter
-        if (parseFloat(percentage) <= 5) return null;
+    const createPieLabelFunction =
+        (total: number) =>
+        (props: {
+            value?: number;
+            cx?: number;
+            cy?: number;
+            midAngle?: number;
+            innerRadius?: number;
+            outerRadius?: number;
+            [key: string]: unknown;
+        }) => {
+            const { value, cx, cy, midAngle, innerRadius, outerRadius } = props;
+            if (!value || total === 0) return null;
+            const percentage = ((value / total) * 100).toFixed(1);
+            // Only show label if slice is large enough (>5% of total) to avoid clutter
+            if (parseFloat(percentage) <= 5) return null;
 
-        const RADIAN = Math.PI / 180;
-        const radius = (innerRadius || 0) + ((outerRadius || 0) - (innerRadius || 0)) * 0.5;
-        const x = (cx || 0) + radius * Math.cos(-(midAngle || 0) * RADIAN);
-        const y = (cy || 0) + radius * Math.sin(-(midAngle || 0) * RADIAN);
+            const RADIAN = Math.PI / 180;
+            const radius = (innerRadius || 0) + ((outerRadius || 0) - (innerRadius || 0)) * 0.5;
+            const x = (cx || 0) + radius * Math.cos(-(midAngle || 0) * RADIAN);
+            const y = (cy || 0) + radius * Math.sin(-(midAngle || 0) * RADIAN);
 
-        return (
-            <text
-                x={x}
-                y={y}
-                fill="hsl(var(--foreground))"
-                textAnchor={x > (cx || 0) ? 'start' : 'end'}
-                dominantBaseline="central"
-                fontSize={12}
-                fontWeight={500}
-            >
-                {`${value} (${percentage}%)`}
-            </text>
-        );
-    };
+            return (
+                <text
+                    x={x}
+                    y={y}
+                    fill="hsl(var(--foreground))"
+                    textAnchor={x > (cx || 0) ? 'start' : 'end'}
+                    dominantBaseline="central"
+                    fontSize={12}
+                    fontWeight={500}
+                >
+                    {`${value} (${percentage}%)`}
+                </text>
+            );
+        };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -352,9 +354,7 @@ export default function Dashboard() {
                                             const payloadValue = entry.payload?.value;
                                             const numericValue = typeof payloadValue === 'number' ? payloadValue : 0;
                                             const percentage =
-                                                quotationsTotal > 0 && numericValue > 0
-                                                    ? ((numericValue / quotationsTotal) * 100).toFixed(1)
-                                                    : '0';
+                                                quotationsTotal > 0 && numericValue > 0 ? ((numericValue / quotationsTotal) * 100).toFixed(1) : '0';
                                             return (
                                                 <span style={{ color: 'hsl(var(--foreground))', fontSize: '13px', fontWeight: '500' }}>
                                                     <span style={{ color: entry.color, marginRight: '8px' }}>●</span>

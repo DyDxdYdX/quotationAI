@@ -33,7 +33,43 @@ class GeminiController extends Controller
     {
         $serviceType = str_replace('_', ' ', ucwords($data['service_type'], '_'));
         
+        // Handle project dates
+        $startDate = !empty($data['start_date']) ? date('F j, Y', strtotime($data['start_date'])) : null;
+        $endDate = !empty($data['end_date']) ? date('F j, Y', strtotime($data['end_date'])) : null;
+        $hasEndDate = !empty($endDate);
+        $hasStartDate = !empty($startDate);
+        
+        $dateContext = '';
+        if ($hasStartDate) {
+            $dateContext = "PROJECT TIMELINE:\n";
+            $dateContext .= "- Project Start Date: {$startDate}\n";
+            if ($hasEndDate) {
+                $dateContext .= "- Project End Date: {$endDate}\n";
+                // Calculate duration
+                $start = new \DateTime($data['start_date']);
+                $end = new \DateTime($data['end_date']);
+                $diff = $start->diff($end);
+                $weeks = ceil($diff->days / 7);
+                $months = $diff->m + ($diff->y * 12);
+                if ($months > 0) {
+                    $dateContext .= "- Project Duration: Approximately {$months} month(s) (" . ($weeks) . " weeks)\n";
+                } else {
+                    $dateContext .= "- Project Duration: Approximately {$weeks} week(s)\n";
+                }
+            } else {
+                $dateContext .= "- Project End Date: NOT SPECIFIED - You must suggest an appropriate project duration based on the scope and requirements.\n";
+                $dateContext .= "  IMPORTANT: Since no end date is provided, you MUST include a suggested duration estimate in your timeline section.\n";
+                $dateContext .= "  Calculate the duration based on:\n";
+                $dateContext .= "  - The complexity of the problem\n";
+                $dateContext .= "  - The scope of the solution\n";
+                $dateContext .= "  - Industry standards for {$serviceType} projects\n";
+                $dateContext .= "  - Include this duration estimate in the timeline table with specific phase durations\n";
+            }
+        }
+        
         return "You are a professional business consultant helping to create a quotation draft for a {$serviceType} project.
+
+{$dateContext}
 
 IMPORTANT RULES - WHAT YOU SHOULD GENERATE:
 
@@ -56,7 +92,7 @@ IMPORTANT RULES - WHAT YOU SHOULD GENERATE:
 CLIENT REQUIREMENTS:
 - Service Type: {$serviceType}
 - Problem to Solve: {$data['problem']}
-- Proposed Solution: {$data['solution']}
+- Proposed Solution: {$data['solution']}" . ($hasStartDate ? "\n- Project Start Date: {$startDate}" . ($hasEndDate ? "\n- Project End Date: {$endDate}" : "\n- Project End Date: TO BE DETERMINED (you must suggest appropriate duration)") : '') . "
 
 RESPONSE FORMAT:
 You MUST respond with ONLY valid JSON (no markdown code blocks, no explanations, just pure JSON). The JSON structure must be:
@@ -78,7 +114,7 @@ You MUST respond with ONLY valid JSON (no markdown code blocks, no explanations,
         \"type\": \"table\",
         \"headers\": [\"Phase\", \"Estimated Duration (Weeks)\", \"Start Date (Est.)\", \"End Date (Est.)\", \"Milestone Description\"],
         \"rows\": [
-          [\"Discovery & Planning\", \"2\", \"TBD\", \"TBD\", \"In-depth requirement gathering and project planning\"],
+          [\"Discovery & Planning\", \"2\", \"" . ($hasStartDate ? date('M d, Y', strtotime($data['start_date'])) : 'TBD') . "\", \"" . ($hasStartDate && $hasEndDate ? date('M d, Y', strtotime($data['end_date'])) : 'TBD') . "\", \"In-depth requirement gathering and project planning\"],
           [\"Development\", \"4-6\", \"TBD\", \"TBD\", \"Core development work\"]
         ]
       },
@@ -170,7 +206,9 @@ IMPORTANT:
 - List items are simple string arrays
 - Key-value data is an object with string keys and values
 - Accordion items have \"name\", \"availability\", and \"description\" fields
-- Be specific and detailed in all descriptions";
+- Be specific and detailed in all descriptions
+" . (!$hasEndDate && $hasStartDate ? "\nCRITICAL: Since no end date was provided, you MUST:\n- Calculate and suggest an appropriate project duration based on the scope\n- Fill in the timeline table with realistic start and end dates for each phase\n- Ensure the final end date in your timeline reflects the total suggested duration\n- The duration should be reasonable based on the problem complexity and solution scope" : '') . "
+";
     }
 
     /**

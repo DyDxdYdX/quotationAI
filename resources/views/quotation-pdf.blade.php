@@ -179,7 +179,30 @@
     <!-- Date and Quotation Number -->
     <div class="date-ref">
         <strong>Quotation No.:</strong> QTN-{{ str_pad($quotation->id, 6, '0', STR_PAD_LEFT) }}<br>
-        <strong>Date:</strong> {{ date('d F Y', strtotime($quotation->created_at)) }}
+        <strong>Date:</strong> {{ date('d F Y', strtotime($quotation->created_at)) }}<br>
+        @if($quotation->start_date)
+        <strong>Project Start Date:</strong> {{ date('d F Y', strtotime($quotation->start_date)) }}<br>
+        @endif
+        @if($quotation->end_date)
+        <strong>Project End Date:</strong> {{ date('d F Y', strtotime($quotation->end_date)) }}<br>
+        @elseif($quotation->start_date)
+        <strong>Project End Date:</strong> To be determined (duration suggested in timeline)<br>
+        @endif
+        @if($quotation->start_date && $quotation->end_date)
+            @php
+                $start = new DateTime($quotation->start_date);
+                $end = new DateTime($quotation->end_date);
+                $diff = $start->diff($end);
+                $weeks = ceil($diff->days / 7);
+                $months = $diff->m + ($diff->y * 12);
+            @endphp
+            <strong>Project Duration:</strong> 
+            @if($months > 0)
+                {{ $months }} month(s) ({{ $weeks }} weeks)
+            @else
+                {{ $weeks }} week(s)
+            @endif
+        @endif
     </div>
 
     <!-- Recipient -->

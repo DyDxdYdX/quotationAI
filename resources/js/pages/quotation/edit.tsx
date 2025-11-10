@@ -46,6 +46,8 @@ interface Quotation {
     quotation_request_id: number;
     quotation_message: string | object;
     quotation_status: 'pending' | 'approved' | 'rejected';
+    start_date?: string | null;
+    end_date?: string | null;
     created_at: string;
     updated_at: string;
     client?: Client;
@@ -343,6 +345,18 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [editMode, setEditMode] = useState<'preview' | 'edit'>('preview');
+    const [projectDates, setProjectDates] = useState(() => {
+        const formatDate = (date: string | null | undefined): string => {
+            if (!date) return '';
+            // Handle both ISO date strings (with time) and date-only strings
+            const dateStr = date.toString().split('T')[0];
+            return dateStr;
+        };
+        return {
+            start_date: formatDate(quotation.start_date),
+            end_date: formatDate(quotation.end_date),
+        };
+    });
 
     // Reconstruct content whenever form changes
     const [quotationContent, setQuotationContent] = useState(() => {
@@ -447,6 +461,8 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
             const submitData = {
                 quotation_message: JSON.stringify(quotationMessage),
                 quotation_status: form.quotation_status,
+                start_date: projectDates.start_date ? projectDates.start_date : null,
+                end_date: projectDates.end_date ? projectDates.end_date : null,
             };
 
             router.put(`/quotation/${quotation.id}`, submitData, {
@@ -629,7 +645,9 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                                             <span className="font-medium">{quotation.client.company_name}</span>
                                         </div>
                                         <div className="flex flex-col">
-                                            <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Company Registration Number</span>
+                                            <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                                                Company Registration Number
+                                            </span>
                                             <span className="font-medium">{quotation.client.company_registration_number}</span>
                                         </div>
                                         <div className="flex flex-col">
@@ -677,6 +695,52 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                                     <div className="rounded-md bg-muted/50 p-3 text-sm">{quotation.quotation_request.solution}</div>
                                 </div>
                             )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border shadow-sm">
+                        <CardHeader className="border-b bg-muted/30">
+                            <CardTitle className="text-xl font-bold">Project Timeline</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label htmlFor="start_date" className="text-sm font-medium">
+                                        Project Start Date
+                                    </Label>
+                                    <Input
+                                        id="start_date"
+                                        type="date"
+                                        value={projectDates.start_date}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                            setProjectDates({ ...projectDates, start_date: e.target.value })
+                                        }
+                                        className="w-full"
+                                    />
+                                    <p className="text-xs text-muted-foreground">Optional - Leave empty if start date is not determined</p>
+                                    {errors.start_date && <p className="mt-1 text-sm text-red-500">{errors.start_date}</p>}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="end_date" className="text-sm font-medium">
+                                        Project End Date
+                                    </Label>
+                                    <Input
+                                        id="end_date"
+                                        type="date"
+                                        value={projectDates.end_date}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                            setProjectDates({ ...projectDates, end_date: e.target.value })
+                                        }
+                                        min={projectDates.start_date || undefined}
+                                        className="w-full"
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Optional - Leave empty to let AI suggest duration based on project scope
+                                    </p>
+                                    {errors.end_date && <p className="mt-1 text-sm text-red-500">{errors.end_date}</p>}
+                                </div>
+                            </div>
                         </CardContent>
                     </Card>
 
@@ -948,7 +1012,9 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                                                                             .map((item: string, itemIndex: number) => {
                                                                                 // Find the actual index in the original array
                                                                                 const originalItems = section.items || [];
-                                                                                const stringItems = originalItems.filter((i): i is string => typeof i === 'string');
+                                                                                const stringItems = originalItems.filter(
+                                                                                    (i): i is string => typeof i === 'string',
+                                                                                );
                                                                                 const actualIndex = stringItems.indexOf(item);
                                                                                 return (
                                                                                     <div key={itemIndex} className="flex gap-2">
@@ -958,10 +1024,15 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                                                                                                 if (form.format !== 'structured') return;
                                                                                                 const newSections = [...form.sections];
                                                                                                 const currentItems = section.items || [];
-                                                                                                const stringItemsArray = currentItems.filter((i): i is string => typeof i === 'string');
+                                                                                                const stringItemsArray = currentItems.filter(
+                                                                                                    (i): i is string => typeof i === 'string',
+                                                                                                );
                                                                                                 const newItems: string[] = [...stringItemsArray];
                                                                                                 newItems[actualIndex] = e.target.value;
-                                                                                                newSections[sectionIndex] = { ...section, items: newItems };
+                                                                                                newSections[sectionIndex] = {
+                                                                                                    ...section,
+                                                                                                    items: newItems,
+                                                                                                };
                                                                                                 setForm({ ...form, sections: newSections });
                                                                                             }}
                                                                                             placeholder="List item"
@@ -975,9 +1046,16 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                                                                                                 if (form.format !== 'structured') return;
                                                                                                 const newSections = [...form.sections];
                                                                                                 const currentItems = section.items || [];
-                                                                                                const stringItemsArray = currentItems.filter((i): i is string => typeof i === 'string');
-                                                                                                const newItems = stringItemsArray.filter((_, i: number) => i !== actualIndex);
-                                                                                                newSections[sectionIndex] = { ...section, items: newItems };
+                                                                                                const stringItemsArray = currentItems.filter(
+                                                                                                    (i): i is string => typeof i === 'string',
+                                                                                                );
+                                                                                                const newItems = stringItemsArray.filter(
+                                                                                                    (_, i: number) => i !== actualIndex,
+                                                                                                );
+                                                                                                newSections[sectionIndex] = {
+                                                                                                    ...section,
+                                                                                                    items: newItems,
+                                                                                                };
                                                                                                 setForm({ ...form, sections: newSections });
                                                                                             }}
                                                                                             className="text-destructive hover:text-destructive"
@@ -995,7 +1073,9 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                                                                             if (form.format !== 'structured') return;
                                                                             const newSections = [...form.sections];
                                                                             const currentItems = section.items || [];
-                                                                            const stringItemsArray = currentItems.filter((i): i is string => typeof i === 'string');
+                                                                            const stringItemsArray = currentItems.filter(
+                                                                                (i): i is string => typeof i === 'string',
+                                                                            );
                                                                             const newItems: string[] = [...stringItemsArray, ''];
                                                                             newSections[sectionIndex] = { ...section, items: newItems };
                                                                             setForm({ ...form, sections: newSections });
@@ -1157,65 +1237,77 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                                                                                                             {section.headers &&
                                                                                                                 section.headers.map(
                                                                                                                     (_: string, colIndex: number) => (
-                                                                                                                    <td
-                                                                                                                        key={colIndex}
-                                                                                                                        className="border-r p-1 last:border-r-0"
-                                                                                                                    >
-                                                                                                                        <Input
-                                                                                                                            value={
-                                                                                                                                row[colIndex] || ''
-                                                                                                                            }
-                                                                                                                            onChange={(e) => {
-                                                                                                                                if (form.format !== 'structured') return;
-                                                                                                                                const newSections = [
-                                                                                                                                    ...form.sections,
-                                                                                                                                ];
-                                                                                                                                const newRows = [
-                                                                                                                                    ...(section.rows ||
-                                                                                                                                        []),
-                                                                                                                                ];
-                                                                                                                                const newRow = [
-                                                                                                                                    ...newRows[
+                                                                                                                        <td
+                                                                                                                            key={colIndex}
+                                                                                                                            className="border-r p-1 last:border-r-0"
+                                                                                                                        >
+                                                                                                                            <Input
+                                                                                                                                value={
+                                                                                                                                    row[colIndex] ||
+                                                                                                                                    ''
+                                                                                                                                }
+                                                                                                                                onChange={(e) => {
+                                                                                                                                    if (
+                                                                                                                                        form.format !==
+                                                                                                                                        'structured'
+                                                                                                                                    )
+                                                                                                                                        return;
+                                                                                                                                    const newSections =
+                                                                                                                                        [
+                                                                                                                                            ...form.sections,
+                                                                                                                                        ];
+                                                                                                                                    const newRows = [
+                                                                                                                                        ...(section.rows ||
+                                                                                                                                            []),
+                                                                                                                                    ];
+                                                                                                                                    const newRow = [
+                                                                                                                                        ...newRows[
+                                                                                                                                            rowIndex
+                                                                                                                                        ],
+                                                                                                                                    ];
+                                                                                                                                    newRow[colIndex] =
+                                                                                                                                        e.target.value;
+                                                                                                                                    newRows[
                                                                                                                                         rowIndex
-                                                                                                                                    ],
-                                                                                                                                ];
-                                                                                                                                newRow[colIndex] =
-                                                                                                                                    e.target.value;
-                                                                                                                                newRows[rowIndex] =
-                                                                                                                                    newRow;
-                                                                                                                                newSections[
-                                                                                                                                    sectionIndex
-                                                                                                                                ] = {
-                                                                                                                                    ...section,
-                                                                                                                                    rows: newRows,
-                                                                                                                                };
-                                                                                                                                setForm({
-                                                                                                                                    ...form,
-                                                                                                                                    sections:
-                                                                                                                                        newSections,
-                                                                                                                                });
-                                                                                                                            }}
-                                                                                                                            placeholder={`Row ${rowIndex + 1}, Col ${colIndex + 1}`}
-                                                                                                                            className="h-8 border-0 text-xs focus-visible:ring-1"
-                                                                                                                        />
-                                                                                                                    </td>
-                                                                                                                ),
-                                                                                                            )}
+                                                                                                                                    ] = newRow;
+                                                                                                                                    newSections[
+                                                                                                                                        sectionIndex
+                                                                                                                                    ] = {
+                                                                                                                                        ...section,
+                                                                                                                                        rows: newRows,
+                                                                                                                                    };
+                                                                                                                                    setForm({
+                                                                                                                                        ...form,
+                                                                                                                                        sections:
+                                                                                                                                            newSections,
+                                                                                                                                    });
+                                                                                                                                }}
+                                                                                                                                placeholder={`Row ${rowIndex + 1}, Col ${colIndex + 1}`}
+                                                                                                                                className="h-8 border-0 text-xs focus-visible:ring-1"
+                                                                                                                            />
+                                                                                                                        </td>
+                                                                                                                    ),
+                                                                                                                )}
                                                                                                             <td className="p-1 text-center">
                                                                                                                 <Button
                                                                                                                     type="button"
                                                                                                                     variant="ghost"
                                                                                                                     size="sm"
                                                                                                                     onClick={() => {
-                                                                                                                        if (form.format !== 'structured') return;
+                                                                                                                        if (
+                                                                                                                            form.format !==
+                                                                                                                            'structured'
+                                                                                                                        )
+                                                                                                                            return;
                                                                                                                         const newSections = [
                                                                                                                             ...form.sections,
                                                                                                                         ];
-                                                                                                                        const newRows =
-                                                                                                                            (section.rows || []).filter(
-                                                                                                                                (_, i: number) =>
-                                                                                                                                    i !== rowIndex,
-                                                                                                                            );
+                                                                                                                        const newRows = (
+                                                                                                                            section.rows || []
+                                                                                                                        ).filter(
+                                                                                                                            (_, i: number) =>
+                                                                                                                                i !== rowIndex,
+                                                                                                                        );
                                                                                                                         newSections[sectionIndex] = {
                                                                                                                             ...section,
                                                                                                                             rows: newRows,
@@ -1335,110 +1427,161 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                                                                         Array.isArray(section.items) &&
                                                                         section.items
                                                                             .filter(
-                                                                                (item): item is { name: string; availability: string; description: string } =>
-                                                                                                                    typeof item === 'object' && item !== null && 'name' in item,
+                                                                                (
+                                                                                    item,
+                                                                                ): item is {
+                                                                                    name: string;
+                                                                                    availability: string;
+                                                                                    description: string;
+                                                                                } => typeof item === 'object' && item !== null && 'name' in item,
                                                                             )
-                                                                            .map((item: { name: string; availability: string; description: string }, itemIndex: number) => (
-                                                                                <div key={itemIndex} className="space-y-2 rounded border p-2">
-                                                                                    <div className="flex items-center justify-between">
+                                                                            .map(
+                                                                                (
+                                                                                    item: { name: string; availability: string; description: string },
+                                                                                    itemIndex: number,
+                                                                                ) => (
+                                                                                    <div key={itemIndex} className="space-y-2 rounded border p-2">
+                                                                                        <div className="flex items-center justify-between">
+                                                                                            <Input
+                                                                                                value={item.name || ''}
+                                                                                                onChange={(e) => {
+                                                                                                    if (form.format !== 'structured') return;
+                                                                                                    const newSections = [...form.sections];
+                                                                                                    const currentItems = section.items || [];
+                                                                                                    const typedItems = Array.isArray(currentItems)
+                                                                                                        ? currentItems.filter(
+                                                                                                              (
+                                                                                                                  i,
+                                                                                                              ): i is {
+                                                                                                                  name: string;
+                                                                                                                  availability: string;
+                                                                                                                  description: string;
+                                                                                                              } =>
+                                                                                                                  typeof i === 'object' &&
+                                                                                                                  i !== null &&
+                                                                                                                  'name' in i,
+                                                                                                          )
+                                                                                                        : [];
+                                                                                                    const newItems = [...typedItems];
+                                                                                                    newItems[itemIndex] = {
+                                                                                                        ...item,
+                                                                                                        name: e.target.value,
+                                                                                                    };
+                                                                                                    newSections[sectionIndex] = {
+                                                                                                        ...section,
+                                                                                                        items: newItems,
+                                                                                                    };
+                                                                                                    setForm({ ...form, sections: newSections });
+                                                                                                }}
+                                                                                                placeholder="Name"
+                                                                                                className="mr-2 flex-1"
+                                                                                            />
+                                                                                            <Button
+                                                                                                type="button"
+                                                                                                variant="ghost"
+                                                                                                size="sm"
+                                                                                                onClick={() => {
+                                                                                                    if (form.format !== 'structured') return;
+                                                                                                    const newSections = [...form.sections];
+                                                                                                    const currentItems = section.items || [];
+                                                                                                    const typedItems = Array.isArray(currentItems)
+                                                                                                        ? currentItems.filter(
+                                                                                                              (
+                                                                                                                  i,
+                                                                                                              ): i is {
+                                                                                                                  name: string;
+                                                                                                                  availability: string;
+                                                                                                                  description: string;
+                                                                                                              } =>
+                                                                                                                  typeof i === 'object' &&
+                                                                                                                  i !== null &&
+                                                                                                                  'name' in i,
+                                                                                                          )
+                                                                                                        : [];
+                                                                                                    const newItems = typedItems.filter(
+                                                                                                        (_, i: number) => i !== itemIndex,
+                                                                                                    );
+                                                                                                    newSections[sectionIndex] = {
+                                                                                                        ...section,
+                                                                                                        items: newItems,
+                                                                                                    };
+                                                                                                    setForm({ ...form, sections: newSections });
+                                                                                                }}
+                                                                                                className="text-destructive hover:text-destructive"
+                                                                                            >
+                                                                                                <Trash2 className="h-4 w-4" />
+                                                                                            </Button>
+                                                                                        </div>
                                                                                         <Input
-                                                                                            value={item.name || ''}
+                                                                                            value={item.availability || ''}
                                                                                             onChange={(e) => {
                                                                                                 if (form.format !== 'structured') return;
                                                                                                 const newSections = [...form.sections];
                                                                                                 const currentItems = section.items || [];
                                                                                                 const typedItems = Array.isArray(currentItems)
                                                                                                     ? currentItems.filter(
-                                                                                                          (i): i is { name: string; availability: string; description: string } =>
-                                                                                                              typeof i === 'object' && i !== null && 'name' in i,
+                                                                                                          (
+                                                                                                              i,
+                                                                                                          ): i is {
+                                                                                                              name: string;
+                                                                                                              availability: string;
+                                                                                                              description: string;
+                                                                                                          } =>
+                                                                                                              typeof i === 'object' &&
+                                                                                                              i !== null &&
+                                                                                                              'name' in i,
                                                                                                       )
                                                                                                     : [];
                                                                                                 const newItems = [...typedItems];
-                                                                                                newItems[itemIndex] = { ...item, name: e.target.value };
+                                                                                                newItems[itemIndex] = {
+                                                                                                    ...item,
+                                                                                                    availability: e.target.value,
+                                                                                                };
                                                                                                 newSections[sectionIndex] = {
                                                                                                     ...section,
                                                                                                     items: newItems,
                                                                                                 };
                                                                                                 setForm({ ...form, sections: newSections });
                                                                                             }}
-                                                                                            placeholder="Name"
-                                                                                            className="mr-2 flex-1"
+                                                                                            placeholder="Availability"
                                                                                         />
-                                                                                        <Button
-                                                                                            type="button"
-                                                                                            variant="ghost"
-                                                                                            size="sm"
-                                                                                            onClick={() => {
+                                                                                        <textarea
+                                                                                            value={item.description || ''}
+                                                                                            onChange={(e) => {
                                                                                                 if (form.format !== 'structured') return;
                                                                                                 const newSections = [...form.sections];
                                                                                                 const currentItems = section.items || [];
                                                                                                 const typedItems = Array.isArray(currentItems)
                                                                                                     ? currentItems.filter(
-                                                                                                          (i): i is { name: string; availability: string; description: string } =>
-                                                                                                              typeof i === 'object' && i !== null && 'name' in i,
+                                                                                                          (
+                                                                                                              i,
+                                                                                                          ): i is {
+                                                                                                              name: string;
+                                                                                                              availability: string;
+                                                                                                              description: string;
+                                                                                                          } =>
+                                                                                                              typeof i === 'object' &&
+                                                                                                              i !== null &&
+                                                                                                              'name' in i,
                                                                                                       )
                                                                                                     : [];
-                                                                                                const newItems = typedItems.filter(
-                                                                                                    (_, i: number) => i !== itemIndex,
-                                                                                                );
+                                                                                                const newItems = [...typedItems];
+                                                                                                newItems[itemIndex] = {
+                                                                                                    ...item,
+                                                                                                    description: e.target.value,
+                                                                                                };
                                                                                                 newSections[sectionIndex] = {
                                                                                                     ...section,
                                                                                                     items: newItems,
                                                                                                 };
                                                                                                 setForm({ ...form, sections: newSections });
                                                                                             }}
-                                                                                            className="text-destructive hover:text-destructive"
-                                                                                        >
-                                                                                            <Trash2 className="h-4 w-4" />
-                                                                                        </Button>
+                                                                                            placeholder="Description"
+                                                                                            className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-3 text-sm"
+                                                                                        />
                                                                                     </div>
-                                                                                    <Input
-                                                                                        value={item.availability || ''}
-                                                                                        onChange={(e) => {
-                                                                                            if (form.format !== 'structured') return;
-                                                                                            const newSections = [...form.sections];
-                                                                                            const currentItems = section.items || [];
-                                                                                            const typedItems = Array.isArray(currentItems)
-                                                                                                ? currentItems.filter(
-                                                                                                      (i): i is { name: string; availability: string; description: string } =>
-                                                                                                          typeof i === 'object' && i !== null && 'name' in i,
-                                                                                                  )
-                                                                                                : [];
-                                                                                            const newItems = [...typedItems];
-                                                                                            newItems[itemIndex] = {
-                                                                                                ...item,
-                                                                                                availability: e.target.value,
-                                                                                            };
-                                                                                            newSections[sectionIndex] = { ...section, items: newItems };
-                                                                                            setForm({ ...form, sections: newSections });
-                                                                                        }}
-                                                                                        placeholder="Availability"
-                                                                                    />
-                                                                                    <textarea
-                                                                                        value={item.description || ''}
-                                                                                        onChange={(e) => {
-                                                                                            if (form.format !== 'structured') return;
-                                                                                            const newSections = [...form.sections];
-                                                                                            const currentItems = section.items || [];
-                                                                                            const typedItems = Array.isArray(currentItems)
-                                                                                                ? currentItems.filter(
-                                                                                                      (i): i is { name: string; availability: string; description: string } =>
-                                                                                                          typeof i === 'object' && i !== null && 'name' in i,
-                                                                                                  )
-                                                                                                : [];
-                                                                                            const newItems = [...typedItems];
-                                                                                            newItems[itemIndex] = {
-                                                                                                ...item,
-                                                                                                description: e.target.value,
-                                                                                            };
-                                                                                            newSections[sectionIndex] = { ...section, items: newItems };
-                                                                                            setForm({ ...form, sections: newSections });
-                                                                                        }}
-                                                                                        placeholder="Description"
-                                                                                        className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-3 text-sm"
-                                                                                    />
-                                                                                </div>
-                                                                            ))}
+                                                                                ),
+                                                                            )}
                                                                     <Button
                                                                         type="button"
                                                                         variant="outline"
@@ -1449,8 +1592,13 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                                                                             const currentItems = section.items || [];
                                                                             const typedItems = Array.isArray(currentItems)
                                                                                 ? currentItems.filter(
-                                                                                      (i): i is { name: string; availability: string; description: string } =>
-                                                                                          typeof i === 'object' && i !== null && 'name' in i,
+                                                                                      (
+                                                                                          i,
+                                                                                      ): i is {
+                                                                                          name: string;
+                                                                                          availability: string;
+                                                                                          description: string;
+                                                                                      } => typeof i === 'object' && i !== null && 'name' in i,
                                                                                   )
                                                                                 : [];
                                                                             const newItems = [
@@ -1594,60 +1742,65 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                                                                 { cost?: number | string; description?: string }
                                                             >) || {},
                                                         ).map(([key, item]) => {
-                                                        const costItem = item as { cost?: number | string; description?: string };
-                                                        return (
-                                                            <div key={key} className="space-y-3 rounded-lg border p-4">
-                                                                <div className="flex items-center justify-between">
-                                                                    <Label className="text-sm font-medium">
-                                                                        {key.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
-                                                                    </Label>
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        onClick={() => removeCostItem(key)}
-                                                                        className="text-destructive hover:text-destructive"
-                                                                    >
-                                                                        <Trash2 className="h-4 w-4" />
-                                                                    </Button>
-                                                                </div>
-                                                                <div className="space-y-2">
-                                                                    <Input
-                                                                        placeholder="Item key (e.g., discovery_and_planning)"
-                                                                        value={key}
-                                                                        onChange={(e) => {
-                                                                            const newKey = e.target.value;
-                                                                            if (newKey && newKey !== key && form.format === 'text') {
-                                                                                const newCostBreakdown = {
-                                                                                    ...(form.costBreakdown.cost_breakdown as Record<string, unknown>),
-                                                                                };
-                                                                                newCostBreakdown[newKey] = newCostBreakdown[key];
-                                                                                delete newCostBreakdown[key];
-                                                                                setForm({
-                                                                                    ...form,
-                                                                                    costBreakdown: {
-                                                                                        ...form.costBreakdown,
-                                                                                        cost_breakdown: newCostBreakdown,
-                                                                                    },
-                                                                                });
+                                                            const costItem = item as { cost?: number | string; description?: string };
+                                                            return (
+                                                                <div key={key} className="space-y-3 rounded-lg border p-4">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <Label className="text-sm font-medium">
+                                                                            {key.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                                                                        </Label>
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            onClick={() => removeCostItem(key)}
+                                                                            className="text-destructive hover:text-destructive"
+                                                                        >
+                                                                            <Trash2 className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        <Input
+                                                                            placeholder="Item key (e.g., discovery_and_planning)"
+                                                                            value={key}
+                                                                            onChange={(e) => {
+                                                                                const newKey = e.target.value;
+                                                                                if (newKey && newKey !== key && form.format === 'text') {
+                                                                                    const newCostBreakdown = {
+                                                                                        ...(form.costBreakdown.cost_breakdown as Record<
+                                                                                            string,
+                                                                                            unknown
+                                                                                        >),
+                                                                                    };
+                                                                                    newCostBreakdown[newKey] = newCostBreakdown[key];
+                                                                                    delete newCostBreakdown[key];
+                                                                                    setForm({
+                                                                                        ...form,
+                                                                                        costBreakdown: {
+                                                                                            ...form.costBreakdown,
+                                                                                            cost_breakdown: newCostBreakdown,
+                                                                                        },
+                                                                                    });
+                                                                                }
+                                                                            }}
+                                                                            className="font-mono text-xs"
+                                                                        />
+                                                                        <Input
+                                                                            placeholder="Item description"
+                                                                            value={costItem.description || ''}
+                                                                            onChange={(e) => updateCostItem(key, 'description', e.target.value)}
+                                                                        />
+                                                                        <Input
+                                                                            type="number"
+                                                                            placeholder="Cost amount"
+                                                                            value={costItem.cost || 0}
+                                                                            onChange={(e) =>
+                                                                                updateCostItem(key, 'cost', parseFloat(e.target.value) || 0)
                                                                             }
-                                                                        }}
-                                                                        className="font-mono text-xs"
-                                                                    />
-                                                                    <Input
-                                                                        placeholder="Item description"
-                                                                        value={costItem.description || ''}
-                                                                        onChange={(e) => updateCostItem(key, 'description', e.target.value)}
-                                                                    />
-                                                                    <Input
-                                                                        type="number"
-                                                                        placeholder="Cost amount"
-                                                                        value={costItem.cost || 0}
-                                                                        onChange={(e) => updateCostItem(key, 'cost', parseFloat(e.target.value) || 0)}
-                                                                    />
+                                                                        />
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                        );
+                                                            );
                                                         })}
 
                                                         {(!form.costBreakdown.cost_breakdown ||

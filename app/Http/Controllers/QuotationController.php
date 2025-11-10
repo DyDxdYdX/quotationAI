@@ -85,14 +85,18 @@ class QuotationController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+    public function create(Request $request)
     {
         $clients = Client::orderBy('company_name')->get();
         $quotationRequests = QuotationRequest::orderBy('service_type')->get();
         
+        // Get client_id from query parameter if provided
+        $clientId = $request->input('client_id');
+        
         return Inertia::render('quotation/create', [
             'clients' => $clients,
             'quotation_requests' => $quotationRequests,
+            'preselected_client_id' => $clientId ? (int) $clientId : null,
         ]);
     }
 
@@ -123,6 +127,8 @@ class QuotationController extends Controller
             'service_type' => ['required', Rule::in(['web_development', 'mobile_development', 'desktop_development', 'ai_development', 'graphic_design', 'digital_marketing', 'other'])],
             'problem' => 'required|string|max:1000',
             'solution' => 'required|string|max:1000',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
         ]);
 
         try {
@@ -145,12 +151,14 @@ class QuotationController extends Controller
             // Call Google Gemini API
             $aiResponse = $geminiController->callGeminiAPI($prompt);
 
-            // Save quotation with AI response
+            // Save quotation with AI response and project dates
             $quotation = Quotation::create([
                 'client_id' => $validated['client_id'],
                 'quotation_request_id' => $quotationRequest->id,
                 'quotation_message' => $aiResponse,
-                'quotation_status' => 'pending'
+                'quotation_status' => 'pending',
+                'start_date' => $validated['start_date'] ?? null,
+                'end_date' => $validated['end_date'] ?? null,
             ]);
 
             return redirect()->route('manage-quotation')->with('success', 'AI-powered quotation generated successfully!');
@@ -207,12 +215,16 @@ class QuotationController extends Controller
             $validated = $request->validate([
                 'quotation_message' => 'required|string',
                 'quotation_status' => ['required', Rule::in(['pending', 'approved', 'rejected'])],
+                'start_date' => 'nullable|date',
+                'end_date' => 'nullable|date|after_or_equal:start_date',
             ]);
 
             // Update quotation (client and service requirements cannot be changed)
             $quotation->update([
                 'quotation_message' => $validated['quotation_message'],
                 'quotation_status' => $validated['quotation_status'],
+                'start_date' => $validated['start_date'] ?? null,
+                'end_date' => $validated['end_date'] ?? null,
             ]);
 
             return redirect()->route('manage-quotation')->with('success', 'Quotation updated successfully.');
@@ -225,6 +237,8 @@ class QuotationController extends Controller
                 'solution' => 'nullable|string|max:1000',
                 'quotation_message' => 'required|string',
                 'quotation_status' => ['required', Rule::in(['pending', 'approved', 'rejected'])],
+                'start_date' => 'nullable|date',
+                'end_date' => 'nullable|date|after_or_equal:start_date',
             ]);
 
             // Update quotation
@@ -232,6 +246,8 @@ class QuotationController extends Controller
                 'client_id' => $validated['client_id'],
                 'quotation_message' => $validated['quotation_message'],
                 'quotation_status' => $validated['quotation_status'],
+                'start_date' => $validated['start_date'] ?? null,
+                'end_date' => $validated['end_date'] ?? null,
             ]);
 
             // Update quotation request if it exists

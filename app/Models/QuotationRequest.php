@@ -10,10 +10,14 @@ class QuotationRequest extends Model
         'client_id',
         'request_message',
         'service_type',
+        'start_date',
+        'end_date',
     ];
 
     protected $casts = [
         'request_message' => 'array',
+        'start_date' => 'date',
+        'end_date' => 'date',
     ];
 
     protected $appends = [

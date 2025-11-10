@@ -19,7 +19,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { AlertTriangle, EyeIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon, X } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -66,7 +66,15 @@ interface PaginatedClients {
     }>;
 }
 
-export default function Client({ clients, per_page_request, search_request = '' }: { clients: PaginatedClients; per_page_request: string; search_request?: string }) {
+export default function Client({
+    clients,
+    per_page_request,
+    search_request = '',
+}: {
+    clients: PaginatedClients;
+    per_page_request: string;
+    search_request?: string;
+}) {
     const [viewDialogOpen, setViewDialogOpen] = useState(false);
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -229,6 +237,13 @@ export default function Client({ clients, per_page_request, search_request = '' 
         });
     };
 
+    const handleAddQuotation = (client: Client) => {
+        // Close the dialog immediately
+        setViewDialogOpen(false);
+        // Navigate to quotation create page with client_id pre-selected
+        router.get(`/quotation/create?client_id=${client.id}`);
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Manage Client" />
@@ -272,19 +287,19 @@ export default function Client({ clients, per_page_request, search_request = '' 
                         <div className="border-b px-4 py-4">
                             <form onSubmit={handleSearch} className="flex gap-2">
                                 <div className="relative flex-1">
-                                    <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <SearchIcon className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                     <Input
                                         type="text"
                                         placeholder="Search clients by company name, supervisor, email, phone, city, address, or registration number..."
                                         value={searchInput}
                                         onChange={(e) => setSearchInput(e.target.value)}
-                                        className="pl-9 pr-9"
+                                        className="pr-9 pl-9"
                                     />
                                     {searchInput && (
                                         <button
                                             type="button"
                                             onClick={handleClearSearch}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                            className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                                         >
                                             <X className="h-4 w-4" />
                                         </button>
@@ -302,7 +317,8 @@ export default function Client({ clients, per_page_request, search_request = '' 
                             </form>
                             {search && (
                                 <p className="mt-2 text-sm text-muted-foreground">
-                                    Showing results for: <span className="font-medium text-foreground">&quot;{search}&quot;</span> ({clients.total} {clients.total === 1 ? 'result' : 'results'})
+                                    Showing results for: <span className="font-medium text-foreground">&quot;{search}&quot;</span> ({clients.total}{' '}
+                                    {clients.total === 1 ? 'result' : 'results'})
                                 </p>
                             )}
                         </div>
@@ -519,7 +535,7 @@ export default function Client({ clients, per_page_request, search_request = '' 
 
             {/* View Client Dialog */}
             <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-                <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-h-[90vh] max-w-[calc(100%-2rem)] overflow-y-auto sm:max-w-4xl">
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-bold">Client Details</DialogTitle>
                     </DialogHeader>
@@ -564,6 +580,13 @@ export default function Client({ clients, per_page_request, search_request = '' 
                         </div>
                     )}
                     <DialogFooter>
+                        <Button 
+                            variant="default" 
+                            onClick={() => selectedClient && handleAddQuotation(selectedClient)}
+                            disabled={!selectedClient}
+                        >
+                            Add Quotation
+                        </Button>
                         <Button variant="default" onClick={() => setViewDialogOpen(false)}>
                             Close
                         </Button>
@@ -573,7 +596,7 @@ export default function Client({ clients, per_page_request, search_request = '' 
 
             {/* Create Client Dialog */}
             <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-h-[90vh] max-w-[calc(100%-2rem)] overflow-y-auto sm:max-w-4xl">
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-bold">Add New Client</DialogTitle>
                     </DialogHeader>
@@ -662,7 +685,7 @@ export default function Client({ clients, per_page_request, search_request = '' 
 
             {/* Edit Client Dialog */}
             <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-                <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-h-[90vh] max-w-[calc(100%-2rem)] overflow-y-auto sm:max-w-4xl">
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-bold">Edit Client</DialogTitle>
                     </DialogHeader>

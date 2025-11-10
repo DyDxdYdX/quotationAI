@@ -282,9 +282,11 @@ const GeminiTextRenderer: React.FC<QuotationRendererProps> = ({ quotationData, c
                         <div className="space-y-4">
                             {(() => {
                                 // Handle nested cost_breakdown structure
-                                const breakdown = (typeof costBreakdown === 'object' && costBreakdown !== null && 'cost_breakdown' in costBreakdown
-                                    ? (costBreakdown as { cost_breakdown?: Record<string, unknown> }).cost_breakdown
-                                    : costBreakdown) as Record<string, unknown>;
+                                const breakdown = (
+                                    typeof costBreakdown === 'object' && costBreakdown !== null && 'cost_breakdown' in costBreakdown
+                                        ? (costBreakdown as { cost_breakdown?: Record<string, unknown> }).cost_breakdown
+                                        : costBreakdown
+                                ) as Record<string, unknown>;
                                 const items = Object.entries(breakdown).filter(
                                     ([key]) => !['subtotal', 'total_project_cost', 'project_name', 'currency'].includes(key),
                                 );
@@ -791,7 +793,7 @@ const StructuredQuotationRenderer: React.FC<QuotationRendererProps> = ({ quotati
                                 <FileText className="h-6 w-6" />
                                 {title}
                             </CardTitle>
-                            {(typeof meta.generated_at === 'string' || typeof meta.generated_at === 'number') ? (
+                            {typeof meta.generated_at === 'string' || typeof meta.generated_at === 'number' ? (
                                 <div className="mt-2 flex gap-4 text-sm text-muted-foreground">
                                     <span className="flex items-center gap-1">
                                         <Calendar className="h-4 w-4" />
@@ -813,7 +815,7 @@ const StructuredQuotationRenderer: React.FC<QuotationRendererProps> = ({ quotati
             {sections.map((section: Section, index: number) => renderSection(section, index))}
 
             {/* Meta Information */}
-            {(typeof meta.generated_at === 'string' || typeof meta.generated_at === 'number') ? (
+            {typeof meta.generated_at === 'string' || typeof meta.generated_at === 'number' ? (
                 <div className="border-t pt-4 text-center text-xs text-muted-foreground">
                     Generated on {new Date(meta.generated_at).toLocaleString()}
                 </div>
@@ -825,7 +827,8 @@ const StructuredQuotationRenderer: React.FC<QuotationRendererProps> = ({ quotati
 const QuotationRenderer: React.FC<QuotationRendererProps> = ({ quotationData, className = '' }) => {
     // Check if this is the new structured format
     const quotation = quotationData?.quotation;
-    const isStructuredFormat = quotation && typeof quotation === 'object' && 'sections' in quotation && Array.isArray((quotation as { sections?: unknown }).sections);
+    const isStructuredFormat =
+        quotation && typeof quotation === 'object' && 'sections' in quotation && Array.isArray((quotation as { sections?: unknown }).sections);
 
     if (isStructuredFormat) {
         return <StructuredQuotationRenderer quotationData={quotationData} className={className} />;
@@ -1051,11 +1054,9 @@ const QuotationRenderer: React.FC<QuotationRendererProps> = ({ quotationData, cl
             <div className="rounded-lg border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
                 <div className="mb-2 flex items-center gap-2">
                     <div className="h-2 w-2 animate-pulse rounded-full bg-blue-500"></div>
-                    <span className="text-xs font-medium text-blue-700">
-                        {aiGenerated ? 'AI Generated Quotation' : 'Quotation Information'}
-                    </span>
+                    <span className="text-xs font-medium text-blue-700">{aiGenerated ? 'AI Generated Quotation' : 'Quotation Information'}</span>
                 </div>
-                {(typeof generatedAt === 'string' || typeof generatedAt === 'number') ? (
+                {typeof generatedAt === 'string' || typeof generatedAt === 'number' ? (
                     <p className="text-xs text-blue-600">Generated: {new Date(generatedAt).toLocaleString()}</p>
                 ) : null}
                 {error ? (

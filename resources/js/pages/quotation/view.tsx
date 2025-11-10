@@ -43,6 +43,8 @@ interface Quotation {
     quotation_request_id: number;
     quotation_message: string | object;
     quotation_status: 'pending' | 'approved' | 'rejected';
+    start_date?: string | null;
+    end_date?: string | null;
     created_at: string;
     updated_at: string;
     client?: Client;
@@ -104,7 +106,9 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
                     </Button>
                     <div className="flex-1">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-3xl font-bold tracking-tight text-foreground">Quotation QTN-{quotation.id.toString().padStart(6, '0')}</h1>
+                            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                                Quotation QTN-{quotation.id.toString().padStart(6, '0')}
+                            </h1>
                             <Badge className={`${getStatusColor(quotation.quotation_status)} border px-3 py-1 text-xs font-semibold`}>
                                 {quotation.quotation_status.charAt(0).toUpperCase() + quotation.quotation_status.slice(1)}
                             </Badge>
@@ -128,7 +132,9 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
                                             <span className="font-medium">{quotation.client.company_name}</span>
                                         </div>
                                         <div className="flex flex-col">
-                                            <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Company Registration Number</span>
+                                            <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                                                Company Registration Number
+                                            </span>
                                             <span className="font-medium">{quotation.client.company_registration_number}</span>
                                         </div>
                                         <div className="flex flex-col">
@@ -174,6 +180,61 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
                                 <div className="space-y-2">
                                     <Label className="text-sm font-medium">Proposed Solution</Label>
                                     <div className="rounded-md bg-muted/50 p-3 text-sm">{quotation.quotation_request.solution}</div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border shadow-sm">
+                        <CardHeader className="border-b bg-muted/30">
+                            <CardTitle className="text-xl font-bold">Project Timeline</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                                <div className="flex flex-col">
+                                    <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Start Date</span>
+                                    <span className="font-medium">
+                                        {quotation.start_date
+                                            ? new Date(quotation.start_date).toLocaleDateString('en-US', {
+                                                  year: 'numeric',
+                                                  month: 'long',
+                                                  day: 'numeric',
+                                              })
+                                            : 'Not specified'}
+                                    </span>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">End Date</span>
+                                    <span className="font-medium">
+                                        {quotation.end_date
+                                            ? new Date(quotation.end_date).toLocaleDateString('en-US', {
+                                                  year: 'numeric',
+                                                  month: 'long',
+                                                  day: 'numeric',
+                                              })
+                                            : 'Not specified (AI suggested duration)'}
+                                    </span>
+                                </div>
+                            </div>
+                            {quotation.start_date && quotation.end_date && (
+                                <div className="rounded-lg border bg-muted/50 p-4">
+                                    <div className="flex flex-col">
+                                        <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Project Duration</span>
+                                        <span className="font-medium">
+                                            {(() => {
+                                                const start = new Date(quotation.start_date);
+                                                const end = new Date(quotation.end_date);
+                                                const diffTime = Math.abs(end.getTime() - start.getTime());
+                                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                                const weeks = Math.ceil(diffDays / 7);
+                                                const months = Math.floor(weeks / 4);
+                                                if (months > 0) {
+                                                    return `${months} month(s) (${weeks} weeks)`;
+                                                }
+                                                return `${weeks} week(s)`;
+                                            })()}
+                                        </span>
+                                    </div>
                                 </div>
                             )}
                         </CardContent>

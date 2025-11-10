@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('quotation_requests', function (Blueprint $table) {
-            $table->date('start_date')->after('service_type')->nullable();
+        Schema::table('quotations', function (Blueprint $table) {
+            $table->date('start_date')->after('quotation_status')->nullable();
             $table->date('end_date')->after('start_date')->nullable();
         });
     }
@@ -22,9 +22,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('quotation_requests', function (Blueprint $table) {
-            $table->dropColumn('start_date');
-            $table->dropColumn('end_date');
+        Schema::table('quotations', function (Blueprint $table) {
+            $table->dropColumn(['start_date', 'end_date']);
         });
     }
 };

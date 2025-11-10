@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
@@ -11,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import { ArrowLeft, Check, ChevronsUpDown, Loader2, Sparkles } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -33,16 +34,34 @@ interface Client {
     company_registration_number: string;
 }
 
-export default function CreateQuotation({ clients }: { clients: Client[] }) {
+export default function CreateQuotation({ 
+    clients, 
+    preselected_client_id 
+}: { 
+    clients: Client[]; 
+    preselected_client_id?: number | null;
+}) {
     const [form, setForm] = useState({
-        client_id: '',
+        client_id: preselected_client_id ? preselected_client_id.toString() : '',
         service_type: '',
         problem: '',
         solution: '',
+        start_date: '',
+        end_date: '',
     });
     const [isGenerating, setIsGenerating] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [clientComboOpen, setClientComboOpen] = useState(false);
+
+    // Update form when preselected_client_id changes (e.g., from query parameter)
+    useEffect(() => {
+        if (preselected_client_id) {
+            setForm((prev) => ({
+                ...prev,
+                client_id: preselected_client_id.toString(),
+            }));
+        }
+    }, [preselected_client_id]);
 
     const serviceTypes = [
         { value: 'web_development', label: 'Web Development' },
@@ -73,7 +92,14 @@ export default function CreateQuotation({ clients }: { clients: Client[] }) {
         }
 
         try {
-            router.post('/quotation/generate', form, {
+            // Prepare form data - convert empty strings to null for dates
+            const formData = {
+                ...form,
+                start_date: form.start_date || null,
+                end_date: form.end_date || null,
+            };
+
+            router.post('/quotation/generate', formData, {
                 onSuccess: () => {
                     // Redirect will be handled by the backend
                 },
@@ -181,7 +207,9 @@ export default function CreateQuotation({ clients }: { clients: Client[] }) {
                                             <span className="font-medium">{selectedClient.company_name}</span>
                                         </div>
                                         <div className="flex flex-col">
-                                            <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Company Registration Number</span>
+                                            <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                                                Company Registration Number
+                                            </span>
                                             <span className="font-medium">{selectedClient.company_registration_number}</span>
                                         </div>
                                         <div className="flex flex-col">
@@ -254,6 +282,48 @@ export default function CreateQuotation({ clients }: { clients: Client[] }) {
                                     required
                                 />
                                 {errors.solution && <p className="mt-1 text-sm text-red-500">{errors.solution}</p>}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border shadow-sm">
+                        <CardHeader className="border-b bg-muted/30">
+                            <CardTitle className="text-xl font-bold">Project Timeline</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label htmlFor="start_date" className="text-sm font-medium">
+                                        Project Start Date
+                                    </Label>
+                                    <Input
+                                        id="start_date"
+                                        type="date"
+                                        value={form.start_date}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, start_date: e.target.value })}
+                                        className="w-full"
+                                    />
+                                    <p className="text-xs text-muted-foreground">Optional - Leave empty if start date is not determined</p>
+                                    {errors.start_date && <p className="mt-1 text-sm text-red-500">{errors.start_date}</p>}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="end_date" className="text-sm font-medium">
+                                        Project End Date
+                                    </Label>
+                                    <Input
+                                        id="end_date"
+                                        type="date"
+                                        value={form.end_date}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, end_date: e.target.value })}
+                                        min={form.start_date || undefined}
+                                        className="w-full"
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Optional - Leave empty to let AI suggest duration based on project scope
+                                    </p>
+                                    {errors.end_date && <p className="mt-1 text-sm text-red-500">{errors.end_date}</p>}
+                                </div>
                             </div>
                         </CardContent>
                     </Card>

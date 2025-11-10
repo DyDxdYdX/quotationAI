@@ -11,6 +11,13 @@ class Quotation extends Model
         'quotation_request_id',
         'quotation_message',
         'quotation_status',
+        'start_date',
+        'end_date',
+    ];
+
+    protected $casts = [
+        'start_date' => 'date',
+        'end_date' => 'date',
     ];
 
     public function client()

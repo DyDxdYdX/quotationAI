@@ -23,9 +23,9 @@ class DashboardController extends Controller
 
         // Quotations by status for pie chart
         $quotationsByStatus = [
-            ['name' => 'Pending', 'value' => $pendingQuotations, 'fill' => 'hsl(var(--chart-1))'],
-            ['name' => 'Approved', 'value' => $approvedQuotations, 'fill' => 'hsl(var(--chart-2))'],
-            ['name' => 'Rejected', 'value' => $rejectedQuotations, 'fill' => 'hsl(var(--chart-3))'],
+            ['name' => 'Pending', 'value' => $pendingQuotations, 'fill' => 'hsl(var(--chart-4))'], // Amber/Yellow
+            ['name' => 'Approved', 'value' => $approvedQuotations, 'fill' => 'hsl(var(--chart-3))'], // Green
+            ['name' => 'Rejected', 'value' => $rejectedQuotations, 'fill' => 'hsl(var(--chart-5))'], // Red
         ];
 
         // Service types distribution

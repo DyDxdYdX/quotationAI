@@ -362,7 +362,7 @@ export default function CreateQuotation({
                                         <span className="text-sm font-medium">Generating quotation with AI...</span>
                                     </div>
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        Please wait while we process your request with Google Gemini API
+                                        Please wait while we process your request
                                     </p>
                                 </div>
                             )}

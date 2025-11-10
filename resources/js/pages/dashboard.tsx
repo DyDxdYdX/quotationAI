@@ -14,6 +14,16 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
+const serviceTypeLabels = {
+    web_development: 'Web Development',
+    mobile_development: 'Mobile Development',
+    desktop_development: 'Desktop Development',
+    ai_development: 'AI Development',
+    graphic_design: 'Graphic Design',
+    digital_marketing: 'Digital Marketing',
+    other: 'Other',
+};
+
 interface DashboardPageProps extends SharedData {
     analytics: {
         totalClients: number;
@@ -33,7 +43,7 @@ interface DashboardPageProps extends SharedData {
         quotation_status: string;
         created_at: string;
         client?: { company_name: string };
-        quotationRequest?: { service_type: string };
+        quotation_request?: { service_type: string };
     }>;
 }
 
@@ -44,15 +54,15 @@ const chartConfig = {
     },
     pending: {
         label: 'Pending',
-        color: 'hsl(var(--chart-1))',
+        color: 'hsl(var(--chart-4))', // Amber/Yellow
     },
     approved: {
         label: 'Approved',
-        color: 'hsl(var(--chart-2))',
+        color: 'hsl(var(--chart-3))', // Green
     },
     rejected: {
         label: 'Rejected',
-        color: 'hsl(var(--chart-3))',
+        color: 'hsl(var(--chart-5))', // Red
     },
 };
 
@@ -457,7 +467,7 @@ export default function Dashboard() {
                                     quotation_status: string;
                                     created_at: string;
                                     client?: { company_name: string };
-                                    quotationRequest?: { service_type: string };
+                                    quotation_request?: { service_type: string };
                                 }) => (
                                     <div
                                         key={quotation.id}
@@ -468,7 +478,9 @@ export default function Dashboard() {
                                             <div>
                                                 <p className="font-medium text-foreground">{quotation.client?.company_name || 'Unknown Client'}</p>
                                                 <p className="text-sm text-muted-foreground">
-                                                    {quotation.quotationRequest?.service_type.replace('_', ' ') || 'Unknown Service'}
+                                                    {quotation.quotation_request?.service_type
+                                                        ? serviceTypeLabels[quotation.quotation_request.service_type as keyof typeof serviceTypeLabels] || 'Unknown Service'
+                                                        : 'Unknown Service'}
                                                 </p>
                                             </div>
                                         </div>

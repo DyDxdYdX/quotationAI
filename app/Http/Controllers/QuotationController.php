@@ -10,6 +10,7 @@ use Inertia\Inertia;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\GeminiController;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class QuotationController extends Controller
 {
@@ -141,6 +142,8 @@ class QuotationController extends Controller
             $quotationRequest = QuotationRequest::create([
                 'client_id' => $validated['client_id'],
                 'service_type' => $validated['service_type'],
+                'start_date' => $validated['start_date'] ?? null,
+                'end_date' => $validated['end_date'] ?? null,
                 'request_message' => json_encode([
                     'problem' => $validated['problem'],
                     'solution' => $validated['solution'],
@@ -161,7 +164,7 @@ class QuotationController extends Controller
                 'end_date' => $validated['end_date'] ?? null,
             ]);
 
-            return redirect()->route('manage-quotation')->with('success', 'AI-powered quotation generated successfully!');
+            return redirect()->route('quotation.show', $quotation)->with('success', 'AI-powered quotation generated successfully!');
 
         } catch (\Exception $e) {
             Log::error('Quotation generation failed: ' . $e->getMessage());
@@ -267,7 +270,19 @@ class QuotationController extends Controller
     {
         $quotation->load(['client', 'quotationRequest']);
         
-        return view('quotation-pdf', compact('quotation'));
+        // Generate PDF from blade view
+        $pdf = Pdf::loadView('quotation-pdf', compact('quotation'));
+        
+        // Set PDF options
+        $pdf->setPaper('A4', 'portrait');
+        $pdf->setOption('enable-local-file-access', true);
+        
+        // Generate filename
+        $quotationNumber = 'QTN-' . str_pad($quotation->id, 6, '0', STR_PAD_LEFT);
+        $filename = "Quotation_{$quotationNumber}.pdf";
+        
+        // Return PDF as download
+        return $pdf->download($filename);
     }
 
     /**

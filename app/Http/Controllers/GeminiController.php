@@ -243,7 +243,7 @@ CRITICAL REQUIREMENTS:
 - Validate that your JSON is valid and parseable";
 
             $response = $client->withV1BetaVersion()
-                ->generativeModel(ModelName::GEMINI_2_5_FLASH_LITE_PREVIEW_06_17)
+                ->generativeModel(ModelName::GEMINI_2_5_FLASH)
                 ->withSystemInstruction($systemInstruction)
                 ->generateContent(
                     new TextPart($prompt),

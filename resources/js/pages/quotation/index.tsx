@@ -219,10 +219,29 @@ export default function Quotation({
         );
     };
 
-    const handleDownloadPdf = (quotation: Quotation) => {
+    const handleDownloadPdf = async (quotation: Quotation) => {
         // Only allow download if status is approved
         if (quotation.quotation_status === 'approved') {
-            window.open(`/quotation/${quotation.id}/pdf`, '_blank');
+            try {
+                const response = await fetch(`/quotation/${quotation.id}/pdf`, {
+                    credentials: 'include', // Include cookies for authentication
+                });
+                if (!response.ok) throw new Error('Failed to generate PDF');
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `Quotation_QTN-${quotation.id.toString().padStart(6, '0')}.pdf`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Error downloading PDF:', error);
+                // Fallback to direct navigation
+                window.location.href = `/quotation/${quotation.id}/pdf`;
+            }
         }
     };
 

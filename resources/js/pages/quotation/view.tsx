@@ -302,7 +302,30 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                     <Button
-                                        onClick={() => window.open(`/quotation/${quotation.id}/pdf`, '_blank')}
+                                        onClick={async () => {
+                                            if (quotation.quotation_status === 'approved') {
+                                                try {
+                                                    const response = await fetch(`/quotation/${quotation.id}/pdf`, {
+                                                        credentials: 'include', // Include cookies for authentication
+                                                    });
+                                                    if (!response.ok) throw new Error('Failed to generate PDF');
+                                                    
+                                                    const blob = await response.blob();
+                                                    const url = window.URL.createObjectURL(blob);
+                                                    const link = document.createElement('a');
+                                                    link.href = url;
+                                                    link.download = `Quotation_QTN-${quotation.id.toString().padStart(6, '0')}.pdf`;
+                                                    document.body.appendChild(link);
+                                                    link.click();
+                                                    document.body.removeChild(link);
+                                                    window.URL.revokeObjectURL(url);
+                                                } catch (error) {
+                                                    console.error('Error downloading PDF:', error);
+                                                    // Fallback to direct navigation
+                                                    window.location.href = `/quotation/${quotation.id}/pdf`;
+                                                }
+                                            }
+                                        }}
                                         variant="outline"
                                         className="gap-2 hover:bg-primary/10 hover:text-primary"
                                         disabled={quotation.quotation_status !== 'approved'}

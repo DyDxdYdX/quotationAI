@@ -228,8 +228,9 @@ export default function Welcome() {
                 </section>
 
                 {/* Services Section */}
-                <section className="container mx-auto max-w-7xl bg-muted/30 px-4 py-20 md:px-6">
-                    <div className="mx-auto max-w-6xl">
+                <section className="w-full bg-muted/30 py-20">
+                    <div className="container mx-auto max-w-7xl px-4 md:px-6">
+                        <div className="mx-auto max-w-6xl">
                         <div className="mb-12 text-center">
                             <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">Supported Service Types</h2>
                             <p className="text-lg text-muted-foreground">Generate quotations for various service categories</p>
@@ -249,6 +250,7 @@ export default function Welcome() {
                                     </Card>
                                 );
                             })}
+                        </div>
                         </div>
                     </div>
                 </section>
@@ -289,8 +291,9 @@ export default function Welcome() {
                 </section>
 
                 {/* CTA Section */}
-                <section className="container mx-auto max-w-7xl bg-primary/5 px-4 py-20 md:px-6">
-                    <div className="mx-auto max-w-4xl text-center">
+                <section className="w-full bg-primary/5 py-20">
+                    <div className="container mx-auto max-w-7xl px-4 md:px-6">
+                        <div className="mx-auto max-w-4xl text-center">
                         <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">Ready to Transform Your Quotation Process?</h2>
                         <p className="mb-8 text-lg text-muted-foreground">Join the demo and experience the future of quotation management</p>
                         {auth.user ? (
@@ -313,6 +316,7 @@ export default function Welcome() {
                                 </Button>
                             </div>
                         )}
+                        </div>
                     </div>
                 </section>
 
@@ -344,35 +348,25 @@ export default function Welcome() {
                                                 Dashboard
                                             </Link>
                                         </li>
-                                        <li>
-                                            <Link href={route('dashboard')} className="transition-colors hover:text-foreground">
-                                                Features
-                                            </Link>
-                                        </li>
-                                        <li>
-                                            <Link href={route('dashboard')} className="transition-colors hover:text-foreground">
-                                                Pricing
-                                            </Link>
-                                        </li>
                                     </ul>
                                 </div>
                                 <div>
                                     <h3 className="mb-4 font-semibold">Resources</h3>
                                     <ul className="space-y-2 text-sm text-muted-foreground">
                                         <li>
-                                            <Link href={route('dashboard')} className="transition-colors hover:text-foreground">
+                                            <a href="https://dydxsoft.my" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-foreground">
                                                 Documentation
-                                            </Link>
+                                            </a>
                                         </li>
                                         <li>
-                                            <Link href={route('dashboard')} className="transition-colors hover:text-foreground">
+                                            <a href="https://dydxsoft.my" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-foreground">
                                                 Support
-                                            </Link>
+                                            </a>
                                         </li>
                                         <li>
-                                            <Link href={route('dashboard')} className="transition-colors hover:text-foreground">
+                                            <a href="mailto:dydxsoft@gmail.com" className="transition-colors hover:text-foreground">
                                                 Contact
-                                            </Link>
+                                            </a>
                                         </li>
                                     </ul>
                                 </div>

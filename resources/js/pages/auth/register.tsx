@@ -15,15 +15,23 @@ type RegisterForm = {
     phone_number: string;
     password: string;
     password_confirmation: string;
+    company_name?: string;
+    company_phone?: string;
+    company_email?: string;
+    company_website?: string;
 };
 
 export default function Register() {
-    const { data, setData, post, processing, errors, reset } = useForm<Required<RegisterForm>>({
+    const { data, setData, post, processing, errors, reset } = useForm<RegisterForm>({
         name: '',
         email: '',
         phone_number: '',
         password: '',
         password_confirmation: '',
+        company_name: '',
+        company_phone: '',
+        company_email: '',
+        company_website: '',
     });
 
     const submit: FormEventHandler = (e) => {
@@ -118,16 +126,83 @@ export default function Register() {
                         />
                         <InputError message={errors.password_confirmation} />
                     </div>
-
-                    <Button type="submit" className="mt-2 w-full" tabIndex={5} disabled={processing}>
-                        {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                        Create account
-                    </Button>
                 </div>
+
+                <div className="grid gap-6">
+                    <div className="border-t pt-6">
+                        <h3 className="text-lg font-semibold mb-4">Company Information (Optional)</h3>
+                        <div className="grid gap-6">
+                            <div className="grid gap-2">
+                                <Label htmlFor="company_name">Company Name</Label>
+                                <Input
+                                    id="company_name"
+                                    type="text"
+                                    tabIndex={6}
+                                    autoComplete="organization"
+                                    value={data.company_name || ''}
+                                    onChange={(e) => setData('company_name', e.target.value)}
+                                    disabled={processing}
+                                    placeholder="Your company name"
+                                />
+                                <InputError message={errors.company_name} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="company_phone">Company Phone</Label>
+                                <Input
+                                    id="company_phone"
+                                    type="text"
+                                    tabIndex={7}
+                                    autoComplete="tel"
+                                    value={data.company_phone || ''}
+                                    onChange={(e) => setData('company_phone', e.target.value)}
+                                    disabled={processing}
+                                    placeholder="Company phone number"
+                                />
+                                <InputError message={errors.company_phone} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="company_email">Company Email</Label>
+                                <Input
+                                    id="company_email"
+                                    type="email"
+                                    tabIndex={8}
+                                    autoComplete="email"
+                                    value={data.company_email || ''}
+                                    onChange={(e) => setData('company_email', e.target.value)}
+                                    disabled={processing}
+                                    placeholder="company@example.com"
+                                />
+                                <InputError message={errors.company_email} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="company_website">Company Website</Label>
+                                <Input
+                                    id="company_website"
+                                    type="text"
+                                    tabIndex={9}
+                                    autoComplete="url"
+                                    value={data.company_website || ''}
+                                    onChange={(e) => setData('company_website', e.target.value)}
+                                    disabled={processing}
+                                    placeholder="www.example.com"
+                                />
+                                <InputError message={errors.company_website} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <Button type="submit" className="mt-2 w-full" tabIndex={10} disabled={processing}>
+                    {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                    Create account
+                </Button>
 
                 <div className="text-center text-sm text-muted-foreground">
                     Already have an account?{' '}
-                    <TextLink href={route('login')} tabIndex={6}>
+                    <TextLink href={route('login')} tabIndex={11}>
                         Log in
                     </TextLink>
                 </div>

@@ -1,21 +1,15 @@
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
+import QuotationRenderer from '@/components/quotation-renderer';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { router } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
-import { ArrowLeft, Save, Loader2, Eye, Edit, FileText, Plus, Trash2, DollarSign } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import QuotationRenderer from '@/components/quotation-renderer';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import { ArrowLeft, DollarSign, Edit, Eye, Loader2, Plus, Save, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -34,6 +28,7 @@ interface Client {
     company_name: string;
     company_email: string;
     company_phone_number: string;
+    company_registration_number: string;
 }
 
 interface QuotationRequest {
@@ -71,10 +66,9 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
     // Parse quotation message to extract content for editing
     const parseQuotationMessage = () => {
         try {
-            const quotationData = typeof quotation.quotation_message === 'string' 
-                ? JSON.parse(quotation.quotation_message) 
-                : quotation.quotation_message;
-            
+            const quotationData =
+                typeof quotation.quotation_message === 'string' ? JSON.parse(quotation.quotation_message) : quotation.quotation_message;
+
             // Check if it's the new structured format
             if (quotationData?.quotation && Array.isArray(quotationData.quotation.sections)) {
                 return {
@@ -83,7 +77,7 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                     quotation: quotationData.quotation,
                 };
             }
-            
+
             // If it's the new text format, extract the content
             if (quotationData?.format === 'text' && quotationData?.content) {
                 return {
@@ -93,16 +87,17 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                     generated_at: quotationData.generated_at,
                 };
             }
-            
+
             // For old format, return as is
             return quotationData;
         } catch (error) {
             console.error('Error parsing quotation message:', error);
-        return {
+            return {
                 format: 'text',
-                content: typeof quotation.quotation_message === 'string' 
-                ? quotation.quotation_message 
-                : JSON.stringify(quotation.quotation_message, null, 2),
+                content:
+                    typeof quotation.quotation_message === 'string'
+                        ? quotation.quotation_message
+                        : JSON.stringify(quotation.quotation_message, null, 2),
                 ai_generated: false,
                 generated_at: new Date().toISOString(),
             };
@@ -110,13 +105,24 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
     };
 
     const initialQuotationData = parseQuotationMessage();
-    
+
     // Check if it's structured format
     const isStructuredFormat = initialQuotationData.format === 'structured';
-    
+
     // Parse quotation content into editable sections
-    const parseQuotationSections = (content: string) => {
-        const sections: any = {
+    interface QuotationSections {
+        projectOverview: string;
+        timeline: string;
+        costBreakdown: Record<string, unknown> | null;
+        deliverables: string[];
+        technicalRequirements: string;
+        paymentTerms: string;
+        supportOptions: string;
+        [key: string]: unknown;
+    }
+
+    const parseQuotationSections = (content: string): QuotationSections => {
+        const sections: QuotationSections = {
             projectOverview: '',
             timeline: '',
             costBreakdown: null,
@@ -134,10 +140,16 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                 // Handle both formats: { cost_breakdown: {...} } or just { ... } directly
                 if (jsonData.cost_breakdown) {
                     sections.costBreakdown = jsonData;
-                } else if (jsonData.project_name || Object.keys(jsonData).some(k => typeof jsonData[k] === 'object' && jsonData[k].cost !== undefined)) {
+                } else if (
+                    jsonData.project_name ||
+                    Object.keys(jsonData).some((k) => {
+                        const value = jsonData[k];
+                        return typeof value === 'object' && value !== null && 'cost' in value;
+                    })
+                ) {
                     // It's a cost breakdown object structure - ensure it has cost_breakdown property
-                    const costItems: any = {};
-                    Object.keys(jsonData).forEach(key => {
+                    const costItems: Record<string, { cost: number | string; description?: string }> = {};
+                    Object.keys(jsonData).forEach((key) => {
                         if (key !== 'project_name' && key !== 'currency' && typeof jsonData[key] === 'object' && jsonData[key].cost !== undefined) {
                             costItems[key] = jsonData[key];
                         }
@@ -152,7 +164,7 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                 console.error('Failed to parse cost breakdown JSON:', e);
             }
         }
-        
+
         // If no cost breakdown found, initialize with empty structure
         if (!sections.costBreakdown) {
             sections.costBreakdown = {
@@ -161,7 +173,7 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                 cost_breakdown: {},
             };
         }
-        
+
         // Ensure cost_breakdown property exists
         if (!sections.costBreakdown.cost_breakdown) {
             sections.costBreakdown.cost_breakdown = {};
@@ -182,17 +194,17 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
             const match = content.match(pattern);
             if (match && match[1]) {
                 let sectionContent = match[1].trim();
-                
+
                 // Remove JSON code blocks from cost breakdown section
                 if (key === 'costBreakdown') {
                     sectionContent = sectionContent.replace(/```json\s*[\s\S]*?\s*```/g, '').trim();
                 }
-                
+
                 if (key === 'deliverables') {
                     // Extract list items
-                    const listItems = sectionContent.match(/^\s*[\*\-\•]\s+(.+)$/gm);
+                    const listItems = sectionContent.match(/^\s*[*\-•]\s+(.+)$/gm);
                     if (listItems) {
-                        sections.deliverables = listItems.map(item => item.replace(/^\s*[\*\-\•]\s+/, '').trim());
+                        sections.deliverables = listItems.map((item) => item.replace(/^\s*[*\-•]\s+/, '').trim());
                     }
                 } else {
                     sections[key] = sectionContent;
@@ -204,7 +216,7 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
     };
 
     // Reconstruct markdown content from sections
-    const reconstructContent = (sections: any, costBreakdown: any) => {
+    const reconstructContent = (sections: QuotationSections, costBreakdown: Record<string, unknown> | null) => {
         let content = '';
 
         // 1. Project Overview
@@ -250,51 +262,84 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
     };
 
     // Parse structured format sections
-    const parseStructuredSections = (quotation: any) => {
-        const sections: any = {
-            title: quotation?.title || '',
-            currency: quotation?.currency || 'RM',
-            sections: quotation?.sections || [],
+    interface StructuredSections {
+        title: string;
+        sections: Array<{
+            id: string;
+            type: string;
+            title: string;
+            content?: string;
+            headers?: string[];
+            rows?: Array<string[]>;
+            data?: Record<string, unknown>;
+            items?: string[] | Array<{ name: string; availability: string; description: string }>;
+        }>;
+        [key: string]: unknown;
+    }
+
+    const parseStructuredSections = (quotation: Record<string, unknown>): StructuredSections => {
+        return {
+            title: (quotation?.title as string) || '',
+            sections: (quotation?.sections as StructuredSections['sections']) || [],
         };
-        return sections;
     };
 
-    const initialSections = isStructuredFormat 
+    const initialSections = isStructuredFormat
         ? parseStructuredSections(initialQuotationData.quotation)
         : parseQuotationSections(initialQuotationData.content || '');
-    
-    const [form, setForm] = useState<any>(() => {
+
+    type FormState =
+        | {
+              format: 'structured';
+              title: string;
+              currency: string;
+              sections: StructuredSections['sections'];
+              quotation_status: string;
+          }
+        | {
+              format: 'text';
+              sections: QuotationSections;
+              costBreakdown: Record<string, unknown>;
+              quotation_status: string;
+          };
+
+    const [form, setForm] = useState<FormState>(() => {
         if (isStructuredFormat) {
+            const structured = initialSections as StructuredSections;
             return {
                 format: 'structured',
-                title: initialSections.title || '',
-                currency: initialSections.currency || 'RM',
-                sections: initialSections.sections || [],
+                title: structured.title || '',
+                currency: 'RM',
+                sections: structured.sections || [],
                 quotation_status: quotation.quotation_status,
             };
         }
-        
+
+        const textSections = initialSections as QuotationSections;
+        const costBreakdown =
+            textSections.costBreakdown && Object.keys(textSections.costBreakdown).length > 0
+                ? textSections.costBreakdown
+                : {
+                      project_name: '',
+                      currency: 'RM',
+                      cost_breakdown: {},
+                  };
         return {
             format: 'text',
             sections: {
-                projectOverview: initialSections.projectOverview || '',
-                timeline: initialSections.timeline || '',
-                deliverables: initialSections.deliverables || [],
-                technicalRequirements: initialSections.technicalRequirements || '',
-                paymentTerms: initialSections.paymentTerms || '',
-                supportOptions: initialSections.supportOptions || '',
+                projectOverview: textSections.projectOverview || '',
+                timeline: textSections.timeline || '',
+                costBreakdown: costBreakdown,
+                deliverables: textSections.deliverables || [],
+                technicalRequirements: textSections.technicalRequirements || '',
+                paymentTerms: textSections.paymentTerms || '',
+                supportOptions: textSections.supportOptions || '',
             },
-            costBreakdown: initialSections.costBreakdown && Object.keys(initialSections.costBreakdown).length > 0 
-                ? initialSections.costBreakdown 
-                : {
-                    project_name: '',
-                    currency: 'RM',
-                    cost_breakdown: {},
-                },
+            costBreakdown: costBreakdown,
             quotation_status: quotation.quotation_status,
         };
     });
-    
+
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [editMode, setEditMode] = useState<'preview' | 'edit'>('preview');
@@ -302,41 +347,56 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
     // Reconstruct content whenever form changes
     const [quotationContent, setQuotationContent] = useState(() => {
         if (isStructuredFormat) {
-            return JSON.stringify({
-                meta: initialQuotationData.meta || {
-                    ai_generated: true,
-                    generated_at: new Date().toISOString(),
-                    note: 'AI-generated descriptive content. System adds metadata, totals, and templates for legal terms.',
-                    version: '1.0',
+            const structuredForm = form as Extract<FormState, { format: 'structured' }>;
+            return JSON.stringify(
+                {
+                    meta: initialQuotationData.meta || {
+                        ai_generated: true,
+                        generated_at: new Date().toISOString(),
+                        note: 'AI-generated descriptive content. System adds metadata, totals, and templates for legal terms.',
+                        version: '1.0',
+                    },
+                    quotation: {
+                        title: structuredForm.title,
+                        currency: structuredForm.currency,
+                        sections: structuredForm.sections,
+                    },
                 },
-                quotation: {
-                    title: form.title,
-                    currency: form.currency,
-                    sections: form.sections,
-                },
-            }, null, 2);
+                null,
+                2,
+            );
         }
-        return reconstructContent(form.sections, form.costBreakdown);
+        const textForm = form as Extract<FormState, { format: 'text' }>;
+        return reconstructContent(textForm.sections, textForm.costBreakdown);
     });
 
     useEffect(() => {
         if (isStructuredFormat) {
-            setQuotationContent(JSON.stringify({
-                meta: initialQuotationData.meta || {
-                    ai_generated: true,
-                    generated_at: new Date().toISOString(),
-                    note: 'AI-generated descriptive content. System adds metadata, totals, and templates for legal terms.',
-                    version: '1.0',
-                },
-                quotation: {
-                    title: form.title,
-                    currency: form.currency,
-                    sections: form.sections,
-                },
-            }, null, 2));
+            const structuredForm = form as Extract<FormState, { format: 'structured' }>;
+            setQuotationContent(
+                JSON.stringify(
+                    {
+                        meta: initialQuotationData.meta || {
+                            ai_generated: true,
+                            generated_at: new Date().toISOString(),
+                            note: 'AI-generated descriptive content. System adds metadata, totals, and templates for legal terms.',
+                            version: '1.0',
+                        },
+                        quotation: {
+                            title: structuredForm.title,
+                            currency: structuredForm.currency,
+                            sections: structuredForm.sections,
+                        },
+                    },
+                    null,
+                    2,
+                ),
+            );
         } else {
-            setQuotationContent(reconstructContent(form.sections, form.costBreakdown));
+            const textForm = form as Extract<FormState, { format: 'text' }>;
+            setQuotationContent(reconstructContent(textForm.sections, textForm.costBreakdown));
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [form, isStructuredFormat]);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -359,8 +419,9 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
         try {
             // Reconstruct quotation_message JSON with updated content
             let quotationMessage;
-            
+
             if (isStructuredFormat) {
+                const structuredForm = form as Extract<FormState, { format: 'structured' }>;
                 quotationMessage = {
                     meta: initialQuotationData.meta || {
                         ai_generated: true,
@@ -369,9 +430,9 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                         version: '1.0',
                     },
                     quotation: {
-                        title: form.title,
-                        currency: form.currency,
-                        sections: form.sections,
+                        title: structuredForm.title,
+                        currency: structuredForm.currency,
+                        sections: structuredForm.sections,
                     },
                 };
             } else {
@@ -397,7 +458,7 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                 },
                 onFinish: () => {
                     setIsSubmitting(false);
-                }
+                },
             });
         } catch (error) {
             console.error('Error updating quotation:', error);
@@ -407,13 +468,14 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
 
     // Add cost breakdown item
     const addCostItem = () => {
+        if (form.format !== 'text') return;
         const newKey = `item_${Date.now()}`;
         setForm({
             ...form,
             costBreakdown: {
                 ...form.costBreakdown,
                 cost_breakdown: {
-                    ...form.costBreakdown.cost_breakdown,
+                    ...(form.costBreakdown.cost_breakdown as Record<string, unknown>),
                     [newKey]: {
                         description: '',
                         cost: 0,
@@ -425,7 +487,8 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
 
     // Remove cost breakdown item
     const removeCostItem = (key: string) => {
-        const newCostBreakdown = { ...form.costBreakdown.cost_breakdown };
+        if (form.format !== 'text') return;
+        const newCostBreakdown = { ...(form.costBreakdown.cost_breakdown as Record<string, unknown>) };
         delete newCostBreakdown[key];
         setForm({
             ...form,
@@ -438,14 +501,15 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
 
     // Update cost breakdown item
     const updateCostItem = (key: string, field: 'description' | 'cost', value: string | number) => {
+        if (form.format !== 'text') return;
         setForm({
             ...form,
             costBreakdown: {
                 ...form.costBreakdown,
                 cost_breakdown: {
-                    ...form.costBreakdown.cost_breakdown,
+                    ...(form.costBreakdown.cost_breakdown as Record<string, unknown>),
                     [key]: {
-                        ...form.costBreakdown.cost_breakdown[key],
+                        ...((form.costBreakdown.cost_breakdown as Record<string, unknown>)[key] as Record<string, unknown>),
                         [field]: value,
                     },
                 },
@@ -455,6 +519,7 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
 
     // Add deliverable
     const addDeliverable = () => {
+        if (form.format !== 'text') return;
         setForm({
             ...form,
             sections: {
@@ -466,6 +531,7 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
 
     // Remove deliverable
     const removeDeliverable = (index: number) => {
+        if (form.format !== 'text') return;
         setForm({
             ...form,
             sections: {
@@ -477,6 +543,7 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
 
     // Update deliverable
     const updateDeliverable = (index: number, value: string) => {
+        if (form.format !== 'text') return;
         const newDeliverables = [...form.sections.deliverables];
         newDeliverables[index] = value;
         setForm({
@@ -504,6 +571,7 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
     // Get current quotation data for preview
     const getQuotationDataForPreview = () => {
         if (isStructuredFormat) {
+            const structuredForm = form as Extract<FormState, { format: 'structured' }>;
             return {
                 meta: initialQuotationData.meta || {
                     ai_generated: true,
@@ -512,9 +580,9 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                     version: '1.0',
                 },
                 quotation: {
-                    title: form.title,
-                    currency: form.currency,
-                    sections: form.sections,
+                    title: structuredForm.title,
+                    currency: structuredForm.currency,
+                    sections: structuredForm.sections,
                 },
             };
         }
@@ -526,29 +594,23 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
         };
     };
 
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`Edit Quotation #${quotation.id}`} />
-            
+            <Head title={`Edit Quotation QTN-${quotation.id.toString().padStart(6, '0')} - ${quotation.client?.company_name}`} />
+
             <div className="px-6 py-4">
-                <div className="flex items-center gap-4 mb-8">
-                    <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => router.get('/manage-quotation')}
-                        className="h-9 w-9"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
+                <div className="mb-8 flex items-center gap-4">
+                    <Button variant="outline" size="sm" onClick={() => router.get('/manage-quotation')} className="h-9 w-9">
+                        <ArrowLeft className="h-4 w-4" />
                     </Button>
                     <div className="flex-1">
                         <div className="flex items-center gap-4">
-                        <h1 className="text-3xl font-bold tracking-tight text-foreground">Edit Quotation #{quotation.id}</h1>
-                            <Badge className={`${getStatusColor(form.quotation_status)} text-xs font-semibold px-3 py-1 border`}>
+                            <h1 className="text-3xl font-bold tracking-tight text-foreground">Edit QTN-{quotation.id.toString().padStart(6, '0')}</h1>
+                            <Badge className={`${getStatusColor(form.quotation_status)} border px-3 py-1 text-xs font-semibold`}>
                                 {form.quotation_status.charAt(0).toUpperCase() + form.quotation_status.slice(1)}
                             </Badge>
                         </div>
-                        <p className="text-muted-foreground mt-2 text-sm">Update quotation details and information</p>
+                        <p className="mt-2 text-sm text-muted-foreground">Update quotation details and information</p>
                     </div>
                 </div>
 
@@ -559,23 +621,27 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                         </CardHeader>
                         <CardContent className="space-y-6">
                             {quotation.client && (
-                                <div className="bg-muted/50 border rounded-lg p-4">
-                                    <h4 className="font-semibold text-sm mb-3">Client Details</h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                <div className="rounded-lg border bg-muted/50 p-4">
+                                    <h4 className="mb-3 text-sm font-semibold">Client Details</h4>
+                                    <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
                                         <div className="flex flex-col">
-                                            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Company</span>
+                                            <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Company</span>
                                             <span className="font-medium">{quotation.client.company_name}</span>
                                         </div>
                                         <div className="flex flex-col">
-                                            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Supervisor</span>
+                                            <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Company Registration Number</span>
+                                            <span className="font-medium">{quotation.client.company_registration_number}</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Supervisor</span>
                                             <span className="font-medium">{quotation.client.supervisor_name}</span>
                                         </div>
                                         <div className="flex flex-col">
-                                            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Email</span>
+                                            <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Email</span>
                                             <span className="font-medium">{quotation.client.company_email}</span>
                                         </div>
                                         <div className="flex flex-col">
-                                            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Phone</span>
+                                            <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Phone</span>
                                             <span className="font-medium">{quotation.client.company_phone_number}</span>
                                         </div>
                                     </div>
@@ -591,7 +657,7 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                         <CardContent className="space-y-6">
                             <div className="space-y-2">
                                 <Label className="text-sm font-medium">Service Type</Label>
-                                <div className="p-3 bg-muted/50 rounded-md">
+                                <div className="rounded-md bg-muted/50 p-3">
                                     <span className="font-medium">
                                         {serviceTypeLabels[quotation.quotation_request?.service_type as keyof typeof serviceTypeLabels] || 'N/A'}
                                     </span>
@@ -599,21 +665,17 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                             </div>
 
                             {quotation.quotation_request?.problem && (
-                            <div className="space-y-2">
+                                <div className="space-y-2">
                                     <Label className="text-sm font-medium">Problem Description</Label>
-                                    <div className="p-3 bg-muted/50 rounded-md text-sm">
-                                        {quotation.quotation_request.problem}
-                                    </div>
-                            </div>
+                                    <div className="rounded-md bg-muted/50 p-3 text-sm">{quotation.quotation_request.problem}</div>
+                                </div>
                             )}
 
                             {quotation.quotation_request?.solution && (
-                            <div className="space-y-2">
+                                <div className="space-y-2">
                                     <Label className="text-sm font-medium">Proposed Solution</Label>
-                                    <div className="p-3 bg-muted/50 rounded-md text-sm">
-                                        {quotation.quotation_request.solution}
-                                    </div>
-                            </div>
+                                    <div className="rounded-md bg-muted/50 p-3 text-sm">{quotation.quotation_request.solution}</div>
+                                </div>
                             )}
                         </CardContent>
                     </Card>
@@ -634,7 +696,7 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                                             onClick={() => setEditMode('preview')}
                                             className="gap-2"
                                         >
-                                            <Eye className="w-4 h-4" />
+                                            <Eye className="h-4 w-4" />
                                             Preview
                                         </Button>
                                         <Button
@@ -644,14 +706,14 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                                             onClick={() => setEditMode('edit')}
                                             className="gap-2"
                                         >
-                                            <Edit className="w-4 h-4" />
+                                            <Edit className="h-4 w-4" />
                                             Edit
                                         </Button>
                                     </div>
                                 </div>
-                                
+
                                 {editMode === 'preview' ? (
-                                    <div className="border rounded-lg p-4 bg-muted/20 min-h-[400px]">
+                                    <div className="min-h-[400px] rounded-lg border bg-muted/20 p-4">
                                         <QuotationRenderer quotationData={getQuotationDataForPreview()} />
                                     </div>
                                 ) : isStructuredFormat ? (
@@ -664,10 +726,14 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                                                 </Label>
                                                 <Input
                                                     id="quotation_title"
-                                                    value={form.title}
-                                                    onChange={(e) => setForm({...form, title: e.target.value})}
+                                                    value={form.format === 'structured' ? form.title : ''}
+                                                    onChange={(e) => {
+                                                        if (form.format === 'structured') {
+                                                            setForm({ ...form, title: e.target.value });
+                                                        }
+                                                    }}
                                                     placeholder="Enter quotation title"
-                                    required
+                                                    required
                                                 />
                                             </div>
                                             <div className="space-y-2">
@@ -676,8 +742,12 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                                                 </Label>
                                                 <Input
                                                     id="quotation_currency"
-                                                    value={form.currency}
-                                                    onChange={(e) => setForm({...form, currency: e.target.value})}
+                                                    value={form.format === 'structured' ? form.currency : ''}
+                                                    onChange={(e) => {
+                                                        if (form.format === 'structured') {
+                                                            setForm({ ...form, currency: e.target.value });
+                                                        }
+                                                    }}
                                                     placeholder="RM"
                                                     required
                                                 />
@@ -687,561 +757,771 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                                         {/* Sections Editor */}
                                         <div className="space-y-4">
                                             <Label className="text-sm font-medium">Sections</Label>
-                                            {form.sections.map((section: any, sectionIndex: number) => (
-                                                <div key={sectionIndex} className="border rounded-lg p-4 space-y-3">
-                                                    <div className="flex items-center justify-between">
-                                                        <Label className="text-sm font-medium">{section.title || `Section ${sectionIndex + 1}`}</Label>
-                                                        <div className="flex gap-2">
-                                                            <Button
-                                                                type="button"
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() => {
-                                                                    const newSections = form.sections.filter((_: any, i: number) => i !== sectionIndex);
-                                                                    setForm({...form, sections: newSections});
-                                                                }}
-                                                                className="text-destructive hover:text-destructive"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    <div className="space-y-2">
-                                                        <Input
-                                                            placeholder="Section Title"
-                                                            value={section.title || ''}
-                                                            onChange={(e) => {
-                                                                const newSections = [...form.sections];
-                                                                newSections[sectionIndex] = {...section, title: e.target.value};
-                                                                setForm({...form, sections: newSections});
-                                                            }}
-                                                        />
-                                                        <Select
-                                                            value={section.type || 'markdown'}
-                                                            onValueChange={(value) => {
-                                                                const newSections = [...form.sections];
-                                                                newSections[sectionIndex] = {...section, type: value};
-                                                                setForm({...form, sections: newSections});
-                                                            }}
-                                >
-                                    <SelectTrigger>
-                                                                <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                                                <SelectItem value="markdown">Markdown</SelectItem>
-                                                                <SelectItem value="table">Table</SelectItem>
-                                                                <SelectItem value="object">Object (Cost Breakdown)</SelectItem>
-                                                                <SelectItem value="list">List</SelectItem>
-                                                                <SelectItem value="key_value">Key-Value</SelectItem>
-                                                                <SelectItem value="accordion">Accordion</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                                        
-                                                        {/* Render editor based on type */}
-                                                        {section.type === 'markdown' && (
-                                                            <textarea
-                                                                value={section.content || ''}
-                                                                onChange={(e) => {
-                                                                    const newSections = [...form.sections];
-                                                                    newSections[sectionIndex] = {...section, content: e.target.value};
-                                                                    setForm({...form, sections: newSections});
-                                                                }}
-                                                                placeholder="Enter markdown content..."
-                                                                className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                                                            />
-                                                        )}
-                                                        
-                                                        {section.type === 'object' && (
-                                                            <div className="space-y-2">
-                                                                <div className="flex items-center justify-between">
-                                                                    <Label className="text-xs">Cost Items</Label>
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        onClick={() => {
-                                                                            const newKey = `item_${Date.now()}`;
-                                                                            const newSections = [...form.sections];
-                                                                            const currentData = section.data || {};
-                                                                            newSections[sectionIndex] = {
-                                                                                ...section,
-                                                                                data: {
-                                                                                    ...currentData,
-                                                                                    [newKey]: { description: '', cost: 0 }
-                                                                                }
-                                                                            };
-                                                                            setForm({...form, sections: newSections});
-                                                                        }}
-                                                                        className="gap-1 h-7 text-xs"
-                                                                    >
-                                                                        <Plus className="w-3 h-3" />
-                                                                        Add
-                                                                    </Button>
-                            </div>
-                                                                {section.data && Object.entries(section.data).map(([key, item]: [string, any]) => (
-                                                                    <div key={key} className="border rounded p-2 space-y-2">
-                                                                        <div className="flex items-center justify-between">
-                                                                            <Input
-                                                                                value={key}
-                                                                                onChange={(e) => {
-                                                                                    const newKey = e.target.value;
-                                                                                    if (newKey && newKey !== key) {
-                                                                                        const newSections = [...form.sections];
-                                                                                        const currentData = {...section.data};
-                                                                                        currentData[newKey] = currentData[key];
-                                                                                        delete currentData[key];
-                                                                                        newSections[sectionIndex] = {...section, data: currentData};
-                                                                                        setForm({...form, sections: newSections});
-                                                                                    }
-                                                                                }}
-                                                                                className="font-mono text-xs flex-1 mr-2"
-                                                                                placeholder="Item key"
-                                                                            />
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                onClick={() => {
-                                                                                    const newSections = [...form.sections];
-                                                                                    const currentData = {...section.data};
-                                                                                    delete currentData[key];
-                                                                                    newSections[sectionIndex] = {...section, data: currentData};
-                                                                                    setForm({...form, sections: newSections});
-                                                                                }}
-                                                                                className="text-destructive hover:text-destructive h-7"
-                                                                            >
-                                                                                <Trash2 className="w-3 h-3" />
-                                                                            </Button>
-                                                                        </div>
-                                                                        <Input
-                                                                            value={item.description || ''}
-                                                                            onChange={(e) => {
-                                                                                const newSections = [...form.sections];
-                                                                                const currentData = {...section.data};
-                                                                                currentData[key] = {...item, description: e.target.value};
-                                                                                newSections[sectionIndex] = {...section, data: currentData};
-                                                                                setForm({...form, sections: newSections});
-                                                                            }}
-                                                                            placeholder="Description"
-                                                                        />
-                                                                        <Input
-                                                                            type="number"
-                                                                            value={item.cost || 0}
-                                                                            onChange={(e) => {
-                                                                                const newSections = [...form.sections];
-                                                                                const currentData = {...section.data};
-                                                                                currentData[key] = {...item, cost: parseFloat(e.target.value) || 0};
-                                                                                newSections[sectionIndex] = {...section, data: currentData};
-                                                                                setForm({...form, sections: newSections});
-                                                                            }}
-                                                                            placeholder="Cost"
-                                                                        />
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                        
-                                                        {section.type === 'list' && (
-                            <div className="space-y-2">
-                                                                {section.items && section.items.map((item: string, itemIndex: number) => (
-                                                                    <div key={itemIndex} className="flex gap-2">
-                                                                        <Input
-                                                                            value={item}
-                                                                            onChange={(e) => {
-                                                                                const newSections = [...form.sections];
-                                                                                const newItems = [...(section.items || [])];
-                                                                                newItems[itemIndex] = e.target.value;
-                                                                                newSections[sectionIndex] = {...section, items: newItems};
-                                                                                setForm({...form, sections: newSections});
-                                                                            }}
-                                                                            placeholder="List item"
-                                                                            className="flex-1"
-                                                                        />
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            onClick={() => {
-                                                                                const newSections = [...form.sections];
-                                                                                const newItems = section.items.filter((_: string, i: number) => i !== itemIndex);
-                                                                                newSections[sectionIndex] = {...section, items: newItems};
-                                                                                setForm({...form, sections: newSections});
-                                                                            }}
-                                                                            className="text-destructive hover:text-destructive"
-                                                                        >
-                                                                            <Trash2 className="w-4 h-4" />
-                                                                        </Button>
-                                                                    </div>
-                                                                ))}
+                                            {form.format === 'structured' &&
+                                                form.sections.map((section, sectionIndex: number) => (
+                                                    <div key={sectionIndex} className="space-y-3 rounded-lg border p-4">
+                                                        <div className="flex items-center justify-between">
+                                                            <Label className="text-sm font-medium">
+                                                                {section.title || `Section ${sectionIndex + 1}`}
+                                                            </Label>
+                                                            <div className="flex gap-2">
                                                                 <Button
                                                                     type="button"
-                                                                    variant="outline"
+                                                                    variant="ghost"
                                                                     size="sm"
                                                                     onClick={() => {
-                                                                        const newSections = [...form.sections];
-                                                                        const newItems = [...(section.items || []), ''];
-                                                                        newSections[sectionIndex] = {...section, items: newItems};
-                                                                        setForm({...form, sections: newSections});
+                                                                        const newSections = form.sections.filter(
+                                                                            (_, i: number) => i !== sectionIndex,
+                                                                        );
+                                                                        setForm({ ...form, sections: newSections });
                                                                     }}
-                                                                    className="gap-2"
+                                                                    className="text-destructive hover:text-destructive"
                                                                 >
-                                                                    <Plus className="w-4 h-4" />
-                                                                    Add Item
+                                                                    <Trash2 className="h-4 w-4" />
                                                                 </Button>
                                                             </div>
-                                                        )}
-                                                        
-                                                        {section.type === 'table' && (
-                                                            <div className="space-y-3">
-                                                                <div className="flex items-center justify-between">
-                                                                    <Label className="text-xs">Table Headers</Label>
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        onClick={() => {
-                                                                            const newSections = [...form.sections];
-                                                                            const currentHeaders = section.headers || [];
-                                                                            newSections[sectionIndex] = {
-                                                                                ...section,
-                                                                                headers: [...currentHeaders, `Header ${currentHeaders.length + 1}`]
-                                                                            };
-                                                                            setForm({...form, sections: newSections});
-                                                                        }}
-                                                                        className="gap-1 h-7 text-xs"
-                                                                    >
-                                                                        <Plus className="w-3 h-3" />
-                                                                        Add Header
-                                                                    </Button>
-                                                                </div>
-                                                                
-                                                                {section.headers && section.headers.length > 0 ? (
-                                                                    <div className="border rounded-lg p-3 space-y-2">
-                                                                        <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${section.headers.length}, 1fr) auto` }}>
-                                                                            {section.headers.map((header: string, headerIndex: number) => (
-                                                                                <div key={headerIndex} className="flex gap-2">
-                                                                                    <Input
-                                                                                        value={header}
-                                                                                        onChange={(e) => {
-                                                                                            const newSections = [...form.sections];
-                                                                                            const newHeaders = [...(section.headers || [])];
-                                                                                            newHeaders[headerIndex] = e.target.value;
-                                                                                            newSections[sectionIndex] = {...section, headers: newHeaders};
-                                                                                            setForm({...form, sections: newSections});
-                                                                                        }}
-                                                                                        placeholder={`Header ${headerIndex + 1}`}
-                                                                                        className="text-xs"
-                                                                                    />
-                                                                                    {section.headers.length > 1 && (
+                                                        </div>
+
+                                                        <div className="space-y-2">
+                                                            <Input
+                                                                placeholder="Section Title"
+                                                                value={section.title || ''}
+                                                                onChange={(e) => {
+                                                                    const newSections = [...form.sections];
+                                                                    newSections[sectionIndex] = { ...section, title: e.target.value };
+                                                                    setForm({ ...form, sections: newSections });
+                                                                }}
+                                                            />
+                                                            <Select
+                                                                value={section.type || 'markdown'}
+                                                                onValueChange={(value) => {
+                                                                    const newSections = [...form.sections];
+                                                                    newSections[sectionIndex] = { ...section, type: value };
+                                                                    setForm({ ...form, sections: newSections });
+                                                                }}
+                                                            >
+                                                                <SelectTrigger>
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="markdown">Markdown</SelectItem>
+                                                                    <SelectItem value="table">Table</SelectItem>
+                                                                    <SelectItem value="object">Object (Cost Breakdown)</SelectItem>
+                                                                    <SelectItem value="list">List</SelectItem>
+                                                                    <SelectItem value="key_value">Key-Value</SelectItem>
+                                                                    <SelectItem value="accordion">Accordion</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+
+                                                            {/* Render editor based on type */}
+                                                            {section.type === 'markdown' && (
+                                                                <textarea
+                                                                    value={section.content || ''}
+                                                                    onChange={(e) => {
+                                                                        const newSections = [...form.sections];
+                                                                        newSections[sectionIndex] = { ...section, content: e.target.value };
+                                                                        setForm({ ...form, sections: newSections });
+                                                                    }}
+                                                                    placeholder="Enter markdown content..."
+                                                                    className="flex min-h-[100px] w-full resize-none rounded-md border border-input bg-background px-3 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                                                />
+                                                            )}
+
+                                                            {section.type === 'object' && (
+                                                                <div className="space-y-2">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <Label className="text-xs">Cost Items</Label>
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={() => {
+                                                                                const newKey = `item_${Date.now()}`;
+                                                                                const newSections = [...form.sections];
+                                                                                const currentData = section.data || {};
+                                                                                newSections[sectionIndex] = {
+                                                                                    ...section,
+                                                                                    data: {
+                                                                                        ...currentData,
+                                                                                        [newKey]: { description: '', cost: 0 },
+                                                                                    },
+                                                                                };
+                                                                                setForm({ ...form, sections: newSections });
+                                                                            }}
+                                                                            className="h-7 gap-1 text-xs"
+                                                                        >
+                                                                            <Plus className="h-3 w-3" />
+                                                                            Add
+                                                                        </Button>
+                                                                    </div>
+                                                                    {section.data &&
+                                                                        Object.entries(section.data).map(([key, item]) => {
+                                                                            const costItem = item as { cost?: number | string; description?: string };
+                                                                            return (
+                                                                                <div key={key} className="space-y-2 rounded border p-2">
+                                                                                    <div className="flex items-center justify-between">
+                                                                                        <Input
+                                                                                            value={key}
+                                                                                            onChange={(e) => {
+                                                                                                const newKey = e.target.value;
+                                                                                                if (newKey && newKey !== key) {
+                                                                                                    const newSections = [...form.sections];
+                                                                                                    const currentData = { ...section.data };
+                                                                                                    currentData[newKey] = currentData[key];
+                                                                                                    delete currentData[key];
+                                                                                                    newSections[sectionIndex] = {
+                                                                                                        ...section,
+                                                                                                        data: currentData,
+                                                                                                    };
+                                                                                                    setForm({ ...form, sections: newSections });
+                                                                                                }
+                                                                                            }}
+                                                                                            className="mr-2 flex-1 font-mono text-xs"
+                                                                                            placeholder="Item key"
+                                                                                        />
                                                                                         <Button
                                                                                             type="button"
                                                                                             variant="ghost"
                                                                                             size="sm"
                                                                                             onClick={() => {
                                                                                                 const newSections = [...form.sections];
-                                                                                                const newHeaders = section.headers.filter((_: string, i: number) => i !== headerIndex);
-                                                                                                // Remove corresponding column from all rows
-                                                                                                const newRows = (section.rows || []).map((row: any[]) => 
-                                                                                                    row.filter((_: any, i: number) => i !== headerIndex)
-                                                                                                );
-                                                                                                newSections[sectionIndex] = {...section, headers: newHeaders, rows: newRows};
-                                                                                                setForm({...form, sections: newSections});
+                                                                                                const currentData = { ...section.data };
+                                                                                                delete currentData[key];
+                                                                                                newSections[sectionIndex] = {
+                                                                                                    ...section,
+                                                                                                    data: currentData,
+                                                                                                };
+                                                                                                setForm({ ...form, sections: newSections });
                                                                                             }}
-                                                                                            className="text-destructive hover:text-destructive h-7 w-7 p-0"
+                                                                                            className="h-7 text-destructive hover:text-destructive"
                                                                                         >
-                                                                                            <Trash2 className="w-3 h-3" />
+                                                                                            <Trash2 className="h-3 w-3" />
                                                                                         </Button>
-                                                                                    )}
+                                                                                    </div>
+                                                                                    <Input
+                                                                                        value={costItem.description || ''}
+                                                                                        onChange={(e) => {
+                                                                                            const newSections = [...form.sections];
+                                                                                            const currentData = { ...section.data };
+                                                                                            currentData[key] = {
+                                                                                                ...costItem,
+                                                                                                description: e.target.value,
+                                                                                            };
+                                                                                            newSections[sectionIndex] = {
+                                                                                                ...section,
+                                                                                                data: currentData,
+                                                                                            };
+                                                                                            setForm({ ...form, sections: newSections });
+                                                                                        }}
+                                                                                        placeholder="Description"
+                                                                                    />
+                                                                                    <Input
+                                                                                        type="number"
+                                                                                        value={costItem.cost || 0}
+                                                                                        onChange={(e) => {
+                                                                                            const newSections = [...form.sections];
+                                                                                            const currentData = { ...section.data };
+                                                                                            currentData[key] = {
+                                                                                                ...costItem,
+                                                                                                cost: parseFloat(e.target.value) || 0,
+                                                                                            };
+                                                                                            newSections[sectionIndex] = {
+                                                                                                ...section,
+                                                                                                data: currentData,
+                                                                                            };
+                                                                                            setForm({ ...form, sections: newSections });
+                                                                                        }}
+                                                                                        placeholder="Cost"
+                                                                                    />
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                </div>
+                                                            )}
+
+                                                            {section.type === 'list' && (
+                                                                <div className="space-y-2">
+                                                                    {section.items &&
+                                                                        Array.isArray(section.items) &&
+                                                                        section.items
+                                                                            .filter((item): item is string => typeof item === 'string')
+                                                                            .map((item: string, itemIndex: number) => {
+                                                                                // Find the actual index in the original array
+                                                                                const originalItems = section.items || [];
+                                                                                const stringItems = originalItems.filter((i): i is string => typeof i === 'string');
+                                                                                const actualIndex = stringItems.indexOf(item);
+                                                                                return (
+                                                                                    <div key={itemIndex} className="flex gap-2">
+                                                                                        <Input
+                                                                                            value={item}
+                                                                                            onChange={(e) => {
+                                                                                                if (form.format !== 'structured') return;
+                                                                                                const newSections = [...form.sections];
+                                                                                                const currentItems = section.items || [];
+                                                                                                const stringItemsArray = currentItems.filter((i): i is string => typeof i === 'string');
+                                                                                                const newItems: string[] = [...stringItemsArray];
+                                                                                                newItems[actualIndex] = e.target.value;
+                                                                                                newSections[sectionIndex] = { ...section, items: newItems };
+                                                                                                setForm({ ...form, sections: newSections });
+                                                                                            }}
+                                                                                            placeholder="List item"
+                                                                                            className="flex-1"
+                                                                                        />
+                                                                                        <Button
+                                                                                            type="button"
+                                                                                            variant="ghost"
+                                                                                            size="sm"
+                                                                                            onClick={() => {
+                                                                                                if (form.format !== 'structured') return;
+                                                                                                const newSections = [...form.sections];
+                                                                                                const currentItems = section.items || [];
+                                                                                                const stringItemsArray = currentItems.filter((i): i is string => typeof i === 'string');
+                                                                                                const newItems = stringItemsArray.filter((_, i: number) => i !== actualIndex);
+                                                                                                newSections[sectionIndex] = { ...section, items: newItems };
+                                                                                                setForm({ ...form, sections: newSections });
+                                                                                            }}
+                                                                                            className="text-destructive hover:text-destructive"
+                                                                                        >
+                                                                                            <Trash2 className="h-4 w-4" />
+                                                                                        </Button>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            if (form.format !== 'structured') return;
+                                                                            const newSections = [...form.sections];
+                                                                            const currentItems = section.items || [];
+                                                                            const stringItemsArray = currentItems.filter((i): i is string => typeof i === 'string');
+                                                                            const newItems: string[] = [...stringItemsArray, ''];
+                                                                            newSections[sectionIndex] = { ...section, items: newItems };
+                                                                            setForm({ ...form, sections: newSections });
+                                                                        }}
+                                                                        className="gap-2"
+                                                                    >
+                                                                        <Plus className="h-4 w-4" />
+                                                                        Add Item
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+
+                                                            {section.type === 'table' && (
+                                                                <div className="space-y-3">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <Label className="text-xs">Table Headers</Label>
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={() => {
+                                                                                const newSections = [...form.sections];
+                                                                                const currentHeaders = section.headers || [];
+                                                                                newSections[sectionIndex] = {
+                                                                                    ...section,
+                                                                                    headers: [
+                                                                                        ...currentHeaders,
+                                                                                        `Header ${currentHeaders.length + 1}`,
+                                                                                    ],
+                                                                                };
+                                                                                setForm({ ...form, sections: newSections });
+                                                                            }}
+                                                                            className="h-7 gap-1 text-xs"
+                                                                        >
+                                                                            <Plus className="h-3 w-3" />
+                                                                            Add Header
+                                                                        </Button>
+                                                                    </div>
+
+                                                                    {section.headers && section.headers.length > 0 ? (
+                                                                        <div className="space-y-2 rounded-lg border p-3">
+                                                                            <div
+                                                                                className="grid gap-2"
+                                                                                style={{
+                                                                                    gridTemplateColumns: `repeat(${section.headers.length}, 1fr) auto`,
+                                                                                }}
+                                                                            >
+                                                                                {section.headers.map((header: string, headerIndex: number) => (
+                                                                                    <div key={headerIndex} className="flex gap-2">
+                                                                                        <Input
+                                                                                            value={header}
+                                                                                            onChange={(e) => {
+                                                                                                const newSections = [...form.sections];
+                                                                                                const newHeaders = [...(section.headers || [])];
+                                                                                                newHeaders[headerIndex] = e.target.value;
+                                                                                                newSections[sectionIndex] = {
+                                                                                                    ...section,
+                                                                                                    headers: newHeaders,
+                                                                                                };
+                                                                                                setForm({ ...form, sections: newSections });
+                                                                                            }}
+                                                                                            placeholder={`Header ${headerIndex + 1}`}
+                                                                                            className="text-xs"
+                                                                                        />
+                                                                                        {section.headers && section.headers.length > 1 && (
+                                                                                            <Button
+                                                                                                type="button"
+                                                                                                variant="ghost"
+                                                                                                size="sm"
+                                                                                                onClick={() => {
+                                                                                                    if (form.format !== 'structured') return;
+                                                                                                    const newSections = [...form.sections];
+                                                                                                    const newHeaders = (section.headers || []).filter(
+                                                                                                        (_: string, i: number) => i !== headerIndex,
+                                                                                                    );
+                                                                                                    // Remove corresponding column from all rows
+                                                                                                    const newRows = (section.rows || []).map(
+                                                                                                        (row: string[]) =>
+                                                                                                            row.filter(
+                                                                                                                (_, i: number) => i !== headerIndex,
+                                                                                                            ),
+                                                                                                    );
+                                                                                                    newSections[sectionIndex] = {
+                                                                                                        ...section,
+                                                                                                        headers: newHeaders,
+                                                                                                        rows: newRows,
+                                                                                                    };
+                                                                                                    setForm({ ...form, sections: newSections });
+                                                                                                }}
+                                                                                                className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                                                                                            >
+                                                                                                <Trash2 className="h-3 w-3" />
+                                                                                            </Button>
+                                                                                        )}
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="rounded-lg border border-dashed py-4 text-center text-sm text-muted-foreground">
+                                                                            No headers yet. Click "Add Header" to add one.
+                                                                        </div>
+                                                                    )}
+
+                                                                    {section.headers && section.headers.length > 0 && (
+                                                                        <div className="space-y-2">
+                                                                            <div className="flex items-center justify-between">
+                                                                                <Label className="text-xs">Table Rows</Label>
+                                                                                <Button
+                                                                                    type="button"
+                                                                                    variant="outline"
+                                                                                    size="sm"
+                                                                                    onClick={() => {
+                                                                                        if (form.format !== 'structured') return;
+                                                                                        const newSections = [...form.sections];
+                                                                                        const currentRows = section.rows || [];
+                                                                                        const headersLength = section.headers?.length || 0;
+                                                                                        const newRow = Array(headersLength).fill('');
+                                                                                        newSections[sectionIndex] = {
+                                                                                            ...section,
+                                                                                            rows: [...currentRows, newRow],
+                                                                                        };
+                                                                                        setForm({ ...form, sections: newSections });
+                                                                                    }}
+                                                                                    className="h-7 gap-1 text-xs"
+                                                                                >
+                                                                                    <Plus className="h-3 w-3" />
+                                                                                    Add Row
+                                                                                </Button>
+                                                                            </div>
+
+                                                                            <div className="overflow-hidden rounded-lg border">
+                                                                                <div className="overflow-x-auto">
+                                                                                    <table className="w-full border-collapse text-sm">
+                                                                                        <thead>
+                                                                                            <tr className="border-b bg-muted/50">
+                                                                                                {section.headers &&
+                                                                                                    section.headers.map(
+                                                                                                        (header: string, hIdx: number) => (
+                                                                                                            <th
+                                                                                                                key={hIdx}
+                                                                                                                className="border-r p-2 text-left font-medium last:border-r-0"
+                                                                                                            >
+                                                                                                                {header || `Column ${hIdx + 1}`}
+                                                                                                            </th>
+                                                                                                        ),
+                                                                                                    )}
+                                                                                                <th className="w-10 p-2"></th>
+                                                                                            </tr>
+                                                                                        </thead>
+                                                                                        <tbody>
+                                                                                            {section.rows &&
+                                                                                                section.rows.map(
+                                                                                                    (row: string[], rowIndex: number) => (
+                                                                                                        <tr
+                                                                                                            key={rowIndex}
+                                                                                                            className="border-b hover:bg-muted/30"
+                                                                                                        >
+                                                                                                            {section.headers &&
+                                                                                                                section.headers.map(
+                                                                                                                    (_: string, colIndex: number) => (
+                                                                                                                    <td
+                                                                                                                        key={colIndex}
+                                                                                                                        className="border-r p-1 last:border-r-0"
+                                                                                                                    >
+                                                                                                                        <Input
+                                                                                                                            value={
+                                                                                                                                row[colIndex] || ''
+                                                                                                                            }
+                                                                                                                            onChange={(e) => {
+                                                                                                                                if (form.format !== 'structured') return;
+                                                                                                                                const newSections = [
+                                                                                                                                    ...form.sections,
+                                                                                                                                ];
+                                                                                                                                const newRows = [
+                                                                                                                                    ...(section.rows ||
+                                                                                                                                        []),
+                                                                                                                                ];
+                                                                                                                                const newRow = [
+                                                                                                                                    ...newRows[
+                                                                                                                                        rowIndex
+                                                                                                                                    ],
+                                                                                                                                ];
+                                                                                                                                newRow[colIndex] =
+                                                                                                                                    e.target.value;
+                                                                                                                                newRows[rowIndex] =
+                                                                                                                                    newRow;
+                                                                                                                                newSections[
+                                                                                                                                    sectionIndex
+                                                                                                                                ] = {
+                                                                                                                                    ...section,
+                                                                                                                                    rows: newRows,
+                                                                                                                                };
+                                                                                                                                setForm({
+                                                                                                                                    ...form,
+                                                                                                                                    sections:
+                                                                                                                                        newSections,
+                                                                                                                                });
+                                                                                                                            }}
+                                                                                                                            placeholder={`Row ${rowIndex + 1}, Col ${colIndex + 1}`}
+                                                                                                                            className="h-8 border-0 text-xs focus-visible:ring-1"
+                                                                                                                        />
+                                                                                                                    </td>
+                                                                                                                ),
+                                                                                                            )}
+                                                                                                            <td className="p-1 text-center">
+                                                                                                                <Button
+                                                                                                                    type="button"
+                                                                                                                    variant="ghost"
+                                                                                                                    size="sm"
+                                                                                                                    onClick={() => {
+                                                                                                                        if (form.format !== 'structured') return;
+                                                                                                                        const newSections = [
+                                                                                                                            ...form.sections,
+                                                                                                                        ];
+                                                                                                                        const newRows =
+                                                                                                                            (section.rows || []).filter(
+                                                                                                                                (_, i: number) =>
+                                                                                                                                    i !== rowIndex,
+                                                                                                                            );
+                                                                                                                        newSections[sectionIndex] = {
+                                                                                                                            ...section,
+                                                                                                                            rows: newRows,
+                                                                                                                        };
+                                                                                                                        setForm({
+                                                                                                                            ...form,
+                                                                                                                            sections: newSections,
+                                                                                                                        });
+                                                                                                                    }}
+                                                                                                                    className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                                                                                                                >
+                                                                                                                    <Trash2 className="h-3 w-3" />
+                                                                                                                </Button>
+                                                                                                            </td>
+                                                                                                        </tr>
+                                                                                                    ),
+                                                                                                )}
+                                                                                        </tbody>
+                                                                                    </table>
+                                                                                </div>
+                                                                            </div>
+
+                                                                            {(!section.rows || section.rows.length === 0) && (
+                                                                                <div className="rounded-lg border border-dashed py-4 text-center text-sm text-muted-foreground">
+                                                                                    No rows yet. Click "Add Row" to add one.
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+
+                                                            {section.type === 'key_value' && (
+                                                                <div className="space-y-2">
+                                                                    {section.data &&
+                                                                        Object.entries(section.data).map(([key, value]) => (
+                                                                            <div key={key} className="grid grid-cols-2 gap-2">
+                                                                                <Input
+                                                                                    value={key}
+                                                                                    onChange={(e) => {
+                                                                                        const newKey = e.target.value;
+                                                                                        if (newKey && newKey !== key) {
+                                                                                            const newSections = [...form.sections];
+                                                                                            const currentData = { ...section.data };
+                                                                                            currentData[newKey] = currentData[key];
+                                                                                            delete currentData[key];
+                                                                                            newSections[sectionIndex] = {
+                                                                                                ...section,
+                                                                                                data: currentData,
+                                                                                            };
+                                                                                            setForm({ ...form, sections: newSections });
+                                                                                        }
+                                                                                    }}
+                                                                                    placeholder="Key"
+                                                                                />
+                                                                                <div className="flex gap-2">
+                                                                                    <Input
+                                                                                        value={String(value)}
+                                                                                        onChange={(e) => {
+                                                                                            const newSections = [...form.sections];
+                                                                                            const currentData = { ...section.data };
+                                                                                            currentData[key] = e.target.value;
+                                                                                            newSections[sectionIndex] = {
+                                                                                                ...section,
+                                                                                                data: currentData,
+                                                                                            };
+                                                                                            setForm({ ...form, sections: newSections });
+                                                                                        }}
+                                                                                        placeholder="Value"
+                                                                                        className="flex-1"
+                                                                                    />
+                                                                                    <Button
+                                                                                        type="button"
+                                                                                        variant="ghost"
+                                                                                        size="sm"
+                                                                                        onClick={() => {
+                                                                                            const newSections = [...form.sections];
+                                                                                            const currentData = { ...section.data };
+                                                                                            delete currentData[key];
+                                                                                            newSections[sectionIndex] = {
+                                                                                                ...section,
+                                                                                                data: currentData,
+                                                                                            };
+                                                                                            setForm({ ...form, sections: newSections });
+                                                                                        }}
+                                                                                        className="text-destructive hover:text-destructive"
+                                                                                    >
+                                                                                        <Trash2 className="h-4 w-4" />
+                                                                                    </Button>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            const newSections = [...form.sections];
+                                                                            const currentData = {
+                                                                                ...(section.data || {}),
+                                                                                [`key_${Date.now()}`]: '',
+                                                                            };
+                                                                            newSections[sectionIndex] = { ...section, data: currentData };
+                                                                            setForm({ ...form, sections: newSections });
+                                                                        }}
+                                                                        className="gap-2"
+                                                                    >
+                                                                        <Plus className="h-4 w-4" />
+                                                                        Add Key-Value
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+
+                                                            {section.type === 'accordion' && (
+                                                                <div className="space-y-2">
+                                                                    {section.items &&
+                                                                        Array.isArray(section.items) &&
+                                                                        section.items
+                                                                            .filter(
+                                                                                (item): item is { name: string; availability: string; description: string } =>
+                                                                                                                    typeof item === 'object' && item !== null && 'name' in item,
+                                                                            )
+                                                                            .map((item: { name: string; availability: string; description: string }, itemIndex: number) => (
+                                                                                <div key={itemIndex} className="space-y-2 rounded border p-2">
+                                                                                    <div className="flex items-center justify-between">
+                                                                                        <Input
+                                                                                            value={item.name || ''}
+                                                                                            onChange={(e) => {
+                                                                                                if (form.format !== 'structured') return;
+                                                                                                const newSections = [...form.sections];
+                                                                                                const currentItems = section.items || [];
+                                                                                                const typedItems = Array.isArray(currentItems)
+                                                                                                    ? currentItems.filter(
+                                                                                                          (i): i is { name: string; availability: string; description: string } =>
+                                                                                                              typeof i === 'object' && i !== null && 'name' in i,
+                                                                                                      )
+                                                                                                    : [];
+                                                                                                const newItems = [...typedItems];
+                                                                                                newItems[itemIndex] = { ...item, name: e.target.value };
+                                                                                                newSections[sectionIndex] = {
+                                                                                                    ...section,
+                                                                                                    items: newItems,
+                                                                                                };
+                                                                                                setForm({ ...form, sections: newSections });
+                                                                                            }}
+                                                                                            placeholder="Name"
+                                                                                            className="mr-2 flex-1"
+                                                                                        />
+                                                                                        <Button
+                                                                                            type="button"
+                                                                                            variant="ghost"
+                                                                                            size="sm"
+                                                                                            onClick={() => {
+                                                                                                if (form.format !== 'structured') return;
+                                                                                                const newSections = [...form.sections];
+                                                                                                const currentItems = section.items || [];
+                                                                                                const typedItems = Array.isArray(currentItems)
+                                                                                                    ? currentItems.filter(
+                                                                                                          (i): i is { name: string; availability: string; description: string } =>
+                                                                                                              typeof i === 'object' && i !== null && 'name' in i,
+                                                                                                      )
+                                                                                                    : [];
+                                                                                                const newItems = typedItems.filter(
+                                                                                                    (_, i: number) => i !== itemIndex,
+                                                                                                );
+                                                                                                newSections[sectionIndex] = {
+                                                                                                    ...section,
+                                                                                                    items: newItems,
+                                                                                                };
+                                                                                                setForm({ ...form, sections: newSections });
+                                                                                            }}
+                                                                                            className="text-destructive hover:text-destructive"
+                                                                                        >
+                                                                                            <Trash2 className="h-4 w-4" />
+                                                                                        </Button>
+                                                                                    </div>
+                                                                                    <Input
+                                                                                        value={item.availability || ''}
+                                                                                        onChange={(e) => {
+                                                                                            if (form.format !== 'structured') return;
+                                                                                            const newSections = [...form.sections];
+                                                                                            const currentItems = section.items || [];
+                                                                                            const typedItems = Array.isArray(currentItems)
+                                                                                                ? currentItems.filter(
+                                                                                                      (i): i is { name: string; availability: string; description: string } =>
+                                                                                                          typeof i === 'object' && i !== null && 'name' in i,
+                                                                                                  )
+                                                                                                : [];
+                                                                                            const newItems = [...typedItems];
+                                                                                            newItems[itemIndex] = {
+                                                                                                ...item,
+                                                                                                availability: e.target.value,
+                                                                                            };
+                                                                                            newSections[sectionIndex] = { ...section, items: newItems };
+                                                                                            setForm({ ...form, sections: newSections });
+                                                                                        }}
+                                                                                        placeholder="Availability"
+                                                                                    />
+                                                                                    <textarea
+                                                                                        value={item.description || ''}
+                                                                                        onChange={(e) => {
+                                                                                            if (form.format !== 'structured') return;
+                                                                                            const newSections = [...form.sections];
+                                                                                            const currentItems = section.items || [];
+                                                                                            const typedItems = Array.isArray(currentItems)
+                                                                                                ? currentItems.filter(
+                                                                                                      (i): i is { name: string; availability: string; description: string } =>
+                                                                                                          typeof i === 'object' && i !== null && 'name' in i,
+                                                                                                  )
+                                                                                                : [];
+                                                                                            const newItems = [...typedItems];
+                                                                                            newItems[itemIndex] = {
+                                                                                                ...item,
+                                                                                                description: e.target.value,
+                                                                                            };
+                                                                                            newSections[sectionIndex] = { ...section, items: newItems };
+                                                                                            setForm({ ...form, sections: newSections });
+                                                                                        }}
+                                                                                        placeholder="Description"
+                                                                                        className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-3 text-sm"
+                                                                                    />
                                                                                 </div>
                                                                             ))}
-                                                                        </div>
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="text-center py-4 text-sm text-muted-foreground border border-dashed rounded-lg">
-                                                                        No headers yet. Click "Add Header" to add one.
-                                                                    </div>
-                                                                )}
-                                                                
-                                                                {section.headers && section.headers.length > 0 && (
-                                                                    <div className="space-y-2">
-                                                                        <div className="flex items-center justify-between">
-                                                                            <Label className="text-xs">Table Rows</Label>
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant="outline"
-                                                                                size="sm"
-                                                                                onClick={() => {
-                                                                                    const newSections = [...form.sections];
-                                                                                    const currentRows = section.rows || [];
-                                                                                    const newRow = Array(section.headers.length).fill('');
-                                                                                    newSections[sectionIndex] = {
-                                                                                        ...section,
-                                                                                        rows: [...currentRows, newRow]
-                                                                                    };
-                                                                                    setForm({...form, sections: newSections});
-                                                                                }}
-                                                                                className="gap-1 h-7 text-xs"
-                                                                            >
-                                                                                <Plus className="w-3 h-3" />
-                                                                                Add Row
-                                                                            </Button>
-                                                                        </div>
-                                                                        
-                                                                        <div className="border rounded-lg overflow-hidden">
-                                                                            <div className="overflow-x-auto">
-                                                                                <table className="w-full text-sm border-collapse">
-                                                                                    <thead>
-                                                                                        <tr className="bg-muted/50 border-b">
-                                                                                            {section.headers.map((header: string, hIdx: number) => (
-                                                                                                <th key={hIdx} className="text-left p-2 font-medium border-r last:border-r-0">
-                                                                                                    {header || `Column ${hIdx + 1}`}
-                                                                                                </th>
-                                                                                            ))}
-                                                                                            <th className="w-10 p-2"></th>
-                                                                                        </tr>
-                                                                                    </thead>
-                                                                                    <tbody>
-                                                                                        {section.rows && section.rows.map((row: any[], rowIndex: number) => (
-                                                                                            <tr key={rowIndex} className="border-b hover:bg-muted/30">
-                                                                                                {section.headers.map((_: string, colIndex: number) => (
-                                                                                                    <td key={colIndex} className="p-1 border-r last:border-r-0">
-                                                                                                        <Input
-                                                                                                            value={row[colIndex] || ''}
-                                                                                                            onChange={(e) => {
-                                                                                                                const newSections = [...form.sections];
-                                                                                                                const newRows = [...(section.rows || [])];
-                                                                                                                const newRow = [...newRows[rowIndex]];
-                                                                                                                newRow[colIndex] = e.target.value;
-                                                                                                                newRows[rowIndex] = newRow;
-                                                                                                                newSections[sectionIndex] = {...section, rows: newRows};
-                                                                                                                setForm({...form, sections: newSections});
-                                                                                                            }}
-                                                                                                            placeholder={`Row ${rowIndex + 1}, Col ${colIndex + 1}`}
-                                                                                                            className="border-0 h-8 text-xs focus-visible:ring-1"
-                                                                                                        />
-                                                                                                    </td>
-                                                                                                ))}
-                                                                                                <td className="p-1 text-center">
-                                                                                                    <Button
-                                                                                                        type="button"
-                                                                                                        variant="ghost"
-                                                                                                        size="sm"
-                                                                                                        onClick={() => {
-                                                                                                            const newSections = [...form.sections];
-                                                                                                            const newRows = section.rows.filter((_: any[], i: number) => i !== rowIndex);
-                                                                                                            newSections[sectionIndex] = {...section, rows: newRows};
-                                                                                                            setForm({...form, sections: newSections});
-                                                                                                        }}
-                                                                                                        className="text-destructive hover:text-destructive h-7 w-7 p-0"
-                                                                                                    >
-                                                                                                        <Trash2 className="w-3 h-3" />
-                                                                                                    </Button>
-                                                                                                </td>
-                                                                                            </tr>
-                                                                                        ))}
-                                                                                    </tbody>
-                                                                                </table>
-                                                                            </div>
-                                                                        </div>
-                                                                        
-                                                                        {(!section.rows || section.rows.length === 0) && (
-                                                                            <div className="text-center py-4 text-sm text-muted-foreground border border-dashed rounded-lg">
-                                                                                No rows yet. Click "Add Row" to add one.
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                        
-                                                        {section.type === 'key_value' && (
-                                                            <div className="space-y-2">
-                                                                {section.data && Object.entries(section.data).map(([key, value]: [string, any]) => (
-                                                                    <div key={key} className="grid grid-cols-2 gap-2">
-                                                                        <Input
-                                                                            value={key}
-                                                                            onChange={(e) => {
-                                                                                const newKey = e.target.value;
-                                                                                if (newKey && newKey !== key) {
-                                                                                    const newSections = [...form.sections];
-                                                                                    const currentData = {...section.data};
-                                                                                    currentData[newKey] = currentData[key];
-                                                                                    delete currentData[key];
-                                                                                    newSections[sectionIndex] = {...section, data: currentData};
-                                                                                    setForm({...form, sections: newSections});
-                                                                                }
-                                                                            }}
-                                                                            placeholder="Key"
-                                                                        />
-                                                                        <div className="flex gap-2">
-                                                                            <Input
-                                                                                value={String(value)}
-                                                                                onChange={(e) => {
-                                                                                    const newSections = [...form.sections];
-                                                                                    const currentData = {...section.data};
-                                                                                    currentData[key] = e.target.value;
-                                                                                    newSections[sectionIndex] = {...section, data: currentData};
-                                                                                    setForm({...form, sections: newSections});
-                                                                                }}
-                                                                                placeholder="Value"
-                                                                                className="flex-1"
-                                                                            />
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                onClick={() => {
-                                                                                    const newSections = [...form.sections];
-                                                                                    const currentData = {...section.data};
-                                                                                    delete currentData[key];
-                                                                                    newSections[sectionIndex] = {...section, data: currentData};
-                                                                                    setForm({...form, sections: newSections});
-                                                                                }}
-                                                                                className="text-destructive hover:text-destructive"
-                                                                            >
-                                                                                <Trash2 className="w-4 h-4" />
-                                                                            </Button>
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() => {
-                                                                        const newSections = [...form.sections];
-                                                                        const currentData = {...(section.data || {}), [`key_${Date.now()}`]: ''};
-                                                                        newSections[sectionIndex] = {...section, data: currentData};
-                                                                        setForm({...form, sections: newSections});
-                                                                    }}
-                                                                    className="gap-2"
-                                                                >
-                                                                    <Plus className="w-4 h-4" />
-                                                                    Add Key-Value
-                                                                </Button>
-                                                            </div>
-                                                        )}
-                                                        
-                                                        {section.type === 'accordion' && (
-                                                            <div className="space-y-2">
-                                                                {section.items && section.items.map((item: any, itemIndex: number) => (
-                                                                    <div key={itemIndex} className="border rounded p-2 space-y-2">
-                                                                        <div className="flex items-center justify-between">
-                                                                            <Input
-                                                                                value={item.name || ''}
-                                                                                onChange={(e) => {
-                                                                                    const newSections = [...form.sections];
-                                                                                    const newItems = [...(section.items || [])];
-                                                                                    newItems[itemIndex] = {...item, name: e.target.value};
-                                                                                    newSections[sectionIndex] = {...section, items: newItems};
-                                                                                    setForm({...form, sections: newSections});
-                                                                                }}
-                                                                                placeholder="Name"
-                                                                                className="flex-1 mr-2"
-                                                                            />
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                onClick={() => {
-                                                                                    const newSections = [...form.sections];
-                                                                                    const newItems = section.items.filter((_: any, i: number) => i !== itemIndex);
-                                                                                    newSections[sectionIndex] = {...section, items: newItems};
-                                                                                    setForm({...form, sections: newSections});
-                                                                                }}
-                                                                                className="text-destructive hover:text-destructive"
-                                                                            >
-                                                                                <Trash2 className="w-4 h-4" />
-                                                                            </Button>
-                                                                        </div>
-                                                                        <Input
-                                                                            value={item.availability || ''}
-                                                                            onChange={(e) => {
-                                                                                const newSections = [...form.sections];
-                                                                                const newItems = [...(section.items || [])];
-                                                                                newItems[itemIndex] = {...item, availability: e.target.value};
-                                                                                newSections[sectionIndex] = {...section, items: newItems};
-                                                                                setForm({...form, sections: newSections});
-                                                                            }}
-                                                                            placeholder="Availability"
-                                                                        />
-                                <textarea
-                                                                            value={item.description || ''}
-                                                                            onChange={(e) => {
-                                                                                const newSections = [...form.sections];
-                                                                                const newItems = [...(section.items || [])];
-                                                                                newItems[itemIndex] = {...item, description: e.target.value};
-                                                                                newSections[sectionIndex] = {...section, items: newItems};
-                                                                                setForm({...form, sections: newSections});
-                                                                            }}
-                                                                            placeholder="Description"
-                                                                            className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-3 text-sm"
-                                                                        />
-                            </div>
-                                                                ))}
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() => {
-                                                                        const newSections = [...form.sections];
-                                                                        const newItems = [...(section.items || []), { name: '', availability: '', description: '' }];
-                                                                        newSections[sectionIndex] = {...section, items: newItems};
-                                                                        setForm({...form, sections: newSections});
-                                                                    }}
-                                                                    className="gap-2"
-                                                                >
-                                                                    <Plus className="w-4 h-4" />
-                                                                    Add Accordion Item
-                                                                </Button>
-                                                            </div>
-                                                        )}
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            if (form.format !== 'structured') return;
+                                                                            const newSections = [...form.sections];
+                                                                            const currentItems = section.items || [];
+                                                                            const typedItems = Array.isArray(currentItems)
+                                                                                ? currentItems.filter(
+                                                                                      (i): i is { name: string; availability: string; description: string } =>
+                                                                                          typeof i === 'object' && i !== null && 'name' in i,
+                                                                                  )
+                                                                                : [];
+                                                                            const newItems = [
+                                                                                ...typedItems,
+                                                                                { name: '', availability: '', description: '' },
+                                                                            ];
+                                                                            newSections[sectionIndex] = { ...section, items: newItems };
+                                                                            setForm({ ...form, sections: newSections });
+                                                                        }}
+                                                                        className="gap-2"
+                                                                    >
+                                                                        <Plus className="h-4 w-4" />
+                                                                        Add Accordion Item
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))}
-                                            
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => {
-                                                    setForm({
-                                                        ...form,
-                                                        sections: [...form.sections, {
-                                                            id: `section_${Date.now()}`,
-                                                            type: 'markdown',
-                                                            title: '',
-                                                            content: ''
-                                                        }]
-                                                    });
-                                                }}
-                                                className="gap-2 w-full"
-                                            >
-                                                <Plus className="w-4 h-4" />
-                                                Add Section
-                                            </Button>
+                                                ))}
+
+                                            {form.format === 'structured' && (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        if (form.format !== 'structured') return;
+                                                        setForm({
+                                                            ...form,
+                                                            sections: [
+                                                                ...form.sections,
+                                                                {
+                                                                    id: `section_${Date.now()}`,
+                                                                    type: 'markdown',
+                                                                    title: '',
+                                                                    content: '',
+                                                                },
+                                                            ],
+                                                        });
+                                                    }}
+                                                    className="w-full gap-2"
+                                                >
+                                                    <Plus className="h-4 w-4" />
+                                                    Add Section
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="space-y-6">
                                         {/* Project Overview */}
-                            <div className="space-y-2">
+                                        <div className="space-y-2">
                                             <Label htmlFor="project_overview" className="text-sm font-medium">
                                                 1. Project Overview and Scope *
                                             </Label>
-                                <textarea
+                                            <textarea
                                                 id="project_overview"
-                                                value={form.sections.projectOverview}
-                                                onChange={(e) => setForm({
-                                                    ...form,
-                                                    sections: { ...form.sections, projectOverview: e.target.value }
-                                                })}
+                                                value={form.format === 'text' ? form.sections.projectOverview : ''}
+                                                onChange={(e) => {
+                                                    if (form.format === 'text') {
+                                                        setForm({
+                                                            ...form,
+                                                            sections: { ...form.sections, projectOverview: e.target.value },
+                                                        });
+                                                    }
+                                                }}
                                                 placeholder="Describe the project overview, scope, objectives, and approach..."
-                                    className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                                                className="flex min-h-[120px] w-full resize-none rounded-md border border-input bg-background px-3 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                                 required
-                                />
-                            </div>
+                                            />
+                                        </div>
 
                                         {/* Timeline */}
                                         <div className="space-y-2">
@@ -1250,116 +1530,133 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                                             </Label>
                                             <textarea
                                                 id="timeline"
-                                                value={form.sections.timeline}
-                                                onChange={(e) => setForm({
-                                                    ...form,
-                                                    sections: { ...form.sections, timeline: e.target.value }
-                                                })}
+                                                value={form.format === 'text' ? form.sections.timeline : ''}
+                                                onChange={(e) => {
+                                                    if (form.format === 'text') {
+                                                        setForm({
+                                                            ...form,
+                                                            sections: { ...form.sections, timeline: e.target.value },
+                                                        });
+                                                    }
+                                                }}
                                                 placeholder="Describe project phases, duration, and milestones. You can use markdown table format."
-                                                className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-3 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                                                className="flex min-h-[100px] w-full resize-none rounded-md border border-input bg-background px-3 py-3 font-mono text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                             />
                                         </div>
 
                                         {/* Cost Breakdown */}
                                         <div className="space-y-3">
                                             <div className="flex items-center justify-between">
-                                                <Label className="text-sm font-medium flex items-center gap-2">
-                                                    <DollarSign className="w-4 h-4" />
+                                                <Label className="flex items-center gap-2 text-sm font-medium">
+                                                    <DollarSign className="h-4 w-4" />
                                                     3. Cost Breakdown
                                                 </Label>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={addCostItem}
-                                                    className="gap-2"
-                                                >
-                                                    <Plus className="w-4 h-4" />
+                                                <Button type="button" variant="outline" size="sm" onClick={addCostItem} className="gap-2">
+                                                    <Plus className="h-4 w-4" />
                                                     Add Item
                                                 </Button>
                                             </div>
                                             <div className="space-y-3">
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <Input
-                                                        placeholder="Project Name"
-                                                        value={form.costBreakdown.project_name || ''}
-                                                        onChange={(e) => setForm({
-                                                            ...form,
-                                                            costBreakdown: {
-                                                                ...form.costBreakdown,
-                                                                project_name: e.target.value
-                                                            }
-                                                        })}
-                                                    />
-                                                    <Input
-                                                        placeholder="Currency (e.g., RM)"
-                                                        value={form.costBreakdown.currency || 'RM'}
-                                                        onChange={(e) => setForm({
-                                                            ...form,
-                                                            costBreakdown: {
-                                                                ...form.costBreakdown,
-                                                                currency: e.target.value
-                                                            }
-                                                        })}
-                                                    />
-                                                </div>
-                                                
-                                                {Object.entries(form.costBreakdown.cost_breakdown || {}).map(([key, item]: [string, any]) => (
-                                                    <div key={key} className="border rounded-lg p-4 space-y-3">
-                                                        <div className="flex items-center justify-between">
-                                                            <Label className="text-sm font-medium">
-                                                                {key.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
-                                                            </Label>
-                                                            <Button
-                                                                type="button"
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() => removeCostItem(key)}
-                                                                className="text-destructive hover:text-destructive"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </Button>
-                                                        </div>
-                                                        <div className="space-y-2">
+                                                {form.format === 'text' && (
+                                                    <>
+                                                        <div className="grid grid-cols-2 gap-3">
                                                             <Input
-                                                                placeholder="Item key (e.g., discovery_and_planning)"
-                                                                value={key}
-                                                                onChange={(e) => {
-                                                                    const newKey = e.target.value;
-                                                                    if (newKey && newKey !== key) {
-                                                                        const newCostBreakdown = { ...form.costBreakdown.cost_breakdown };
-                                                                        newCostBreakdown[newKey] = newCostBreakdown[key];
-                                                                        delete newCostBreakdown[key];
-                                                                        setForm({
-                                                                            ...form,
-                                                                            costBreakdown: {
-                                                                                ...form.costBreakdown,
-                                                                                cost_breakdown: newCostBreakdown,
-                                                                            },
-                                                                        });
-                                                                    }
-                                                                }}
-                                                                className="font-mono text-xs"
+                                                                placeholder="Project Name"
+                                                                value={(form.costBreakdown.project_name as string) || ''}
+                                                                onChange={(e) =>
+                                                                    setForm({
+                                                                        ...form,
+                                                                        costBreakdown: {
+                                                                            ...form.costBreakdown,
+                                                                            project_name: e.target.value,
+                                                                        },
+                                                                    })
+                                                                }
                                                             />
                                                             <Input
-                                                                placeholder="Item description"
-                                                                value={item.description || ''}
-                                                                onChange={(e) => updateCostItem(key, 'description', e.target.value)}
-                                                            />
-                                                            <Input
-                                                                type="number"
-                                                                placeholder="Cost amount"
-                                                                value={item.cost || 0}
-                                                                onChange={(e) => updateCostItem(key, 'cost', parseFloat(e.target.value) || 0)}
+                                                                placeholder="Currency (e.g., RM)"
+                                                                value={(form.costBreakdown.currency as string) || 'RM'}
+                                                                onChange={(e) =>
+                                                                    setForm({
+                                                                        ...form,
+                                                                        costBreakdown: {
+                                                                            ...form.costBreakdown,
+                                                                            currency: e.target.value,
+                                                                        },
+                                                                    })
+                                                                }
                                                             />
                                                         </div>
-                                                    </div>
-                                                ))}
-                                                
-                                                {(!form.costBreakdown.cost_breakdown || Object.keys(form.costBreakdown.cost_breakdown).length === 0) && (
-                                                    <div className="text-center py-8 text-sm text-muted-foreground border border-dashed rounded-lg">
-                                                        No cost items yet. Click "Add Item" to add one.
-                                                    </div>
+
+                                                        {Object.entries(
+                                                            (form.costBreakdown.cost_breakdown as Record<
+                                                                string,
+                                                                { cost?: number | string; description?: string }
+                                                            >) || {},
+                                                        ).map(([key, item]) => {
+                                                        const costItem = item as { cost?: number | string; description?: string };
+                                                        return (
+                                                            <div key={key} className="space-y-3 rounded-lg border p-4">
+                                                                <div className="flex items-center justify-between">
+                                                                    <Label className="text-sm font-medium">
+                                                                        {key.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                                                                    </Label>
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={() => removeCostItem(key)}
+                                                                        className="text-destructive hover:text-destructive"
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    </Button>
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                    <Input
+                                                                        placeholder="Item key (e.g., discovery_and_planning)"
+                                                                        value={key}
+                                                                        onChange={(e) => {
+                                                                            const newKey = e.target.value;
+                                                                            if (newKey && newKey !== key && form.format === 'text') {
+                                                                                const newCostBreakdown = {
+                                                                                    ...(form.costBreakdown.cost_breakdown as Record<string, unknown>),
+                                                                                };
+                                                                                newCostBreakdown[newKey] = newCostBreakdown[key];
+                                                                                delete newCostBreakdown[key];
+                                                                                setForm({
+                                                                                    ...form,
+                                                                                    costBreakdown: {
+                                                                                        ...form.costBreakdown,
+                                                                                        cost_breakdown: newCostBreakdown,
+                                                                                    },
+                                                                                });
+                                                                            }
+                                                                        }}
+                                                                        className="font-mono text-xs"
+                                                                    />
+                                                                    <Input
+                                                                        placeholder="Item description"
+                                                                        value={costItem.description || ''}
+                                                                        onChange={(e) => updateCostItem(key, 'description', e.target.value)}
+                                                                    />
+                                                                    <Input
+                                                                        type="number"
+                                                                        placeholder="Cost amount"
+                                                                        value={costItem.cost || 0}
+                                                                        onChange={(e) => updateCostItem(key, 'cost', parseFloat(e.target.value) || 0)}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                        })}
+
+                                                        {(!form.costBreakdown.cost_breakdown ||
+                                                            Object.keys(form.costBreakdown.cost_breakdown).length === 0) && (
+                                                            <div className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
+                                                                No cost items yet. Click "Add Item" to add one.
+                                                            </div>
+                                                        )}
+                                                    </>
                                                 )}
                                             </div>
                                         </div>
@@ -1367,64 +1664,61 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                                         {/* Deliverables */}
                                         <div className="space-y-3">
                                             <div className="flex items-center justify-between">
-                                                <Label className="text-sm font-medium">
-                                                    4. Deliverables and Milestones
-                                                </Label>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={addDeliverable}
-                                                    className="gap-2"
-                                                >
-                                                    <Plus className="w-4 h-4" />
+                                                <Label className="text-sm font-medium">4. Deliverables and Milestones</Label>
+                                                <Button type="button" variant="outline" size="sm" onClick={addDeliverable} className="gap-2">
+                                                    <Plus className="h-4 w-4" />
                                                     Add Deliverable
                                                 </Button>
                                             </div>
                                             <div className="space-y-2">
-                                                {form.sections.deliverables.map((deliverable: string, index: number) => (
-                                                    <div key={index} className="flex items-center gap-2">
-                                                        <Input
-                                                            value={deliverable}
-                                                            onChange={(e) => updateDeliverable(index, e.target.value)}
-                                                            placeholder="Enter deliverable description"
-                                                            className="flex-1"
-                                                        />
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => removeDeliverable(index)}
-                                                            className="text-destructive hover:text-destructive"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </Button>
-                                                </div>
-                                                ))}
-                                                {form.sections.deliverables.length === 0 && (
-                                                    <div className="text-center py-4 text-sm text-muted-foreground border border-dashed rounded-lg">
+                                                {form.format === 'text' &&
+                                                    form.sections.deliverables.map((deliverable: string, index: number) => (
+                                                        <div key={index} className="flex items-center gap-2">
+                                                            <Input
+                                                                value={deliverable}
+                                                                onChange={(e) => updateDeliverable(index, e.target.value)}
+                                                                placeholder="Enter deliverable description"
+                                                                className="flex-1"
+                                                            />
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => removeDeliverable(index)}
+                                                                className="text-destructive hover:text-destructive"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+                                                {form.format === 'text' && form.sections.deliverables.length === 0 && (
+                                                    <div className="rounded-lg border border-dashed py-4 text-center text-sm text-muted-foreground">
                                                         No deliverables yet. Click "Add Deliverable" to add one.
-                                            </div>
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
 
                                         {/* Technical Requirements */}
-                                            <div className="space-y-2">
+                                        <div className="space-y-2">
                                             <Label htmlFor="technical_requirements" className="text-sm font-medium">
                                                 5. Technical Requirements
                                             </Label>
-                                                <textarea
+                                            <textarea
                                                 id="technical_requirements"
-                                                value={form.sections.technicalRequirements}
-                                                onChange={(e) => setForm({
-                                                    ...form,
-                                                    sections: { ...form.sections, technicalRequirements: e.target.value }
-                                                })}
+                                                value={form.format === 'text' ? form.sections.technicalRequirements : ''}
+                                                onChange={(e) => {
+                                                    if (form.format === 'text') {
+                                                        setForm({
+                                                            ...form,
+                                                            sections: { ...form.sections, technicalRequirements: e.target.value },
+                                                        });
+                                                    }
+                                                }}
                                                 placeholder="Describe technical requirements, platforms, technologies needed..."
-                                                className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                                                />
-                                            </div>
+                                                className="flex min-h-[100px] w-full resize-none rounded-md border border-input bg-background px-3 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                            />
+                                        </div>
 
                                         {/* Payment Terms */}
                                         <div className="space-y-2">
@@ -1433,45 +1727,53 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
                                             </Label>
                                             <textarea
                                                 id="payment_terms"
-                                                value={form.sections.paymentTerms}
-                                                onChange={(e) => setForm({
-                                                    ...form,
-                                                    sections: { ...form.sections, paymentTerms: e.target.value }
-                                                })}
+                                                value={form.format === 'text' ? form.sections.paymentTerms : ''}
+                                                onChange={(e) => {
+                                                    if (form.format === 'text') {
+                                                        setForm({
+                                                            ...form,
+                                                            sections: { ...form.sections, paymentTerms: e.target.value },
+                                                        });
+                                                    }
+                                                }}
                                                 placeholder="Describe payment structure and terms..."
-                                                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                                                className="flex min-h-[80px] w-full resize-none rounded-md border border-input bg-background px-3 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                             />
-                            </div>
+                                        </div>
 
                                         {/* Support Options */}
-                            <div className="space-y-2">
+                                        <div className="space-y-2">
                                             <Label htmlFor="support_options" className="text-sm font-medium">
                                                 7. Support and Maintenance Options
                                             </Label>
                                             <textarea
                                                 id="support_options"
-                                                value={form.sections.supportOptions}
-                                                onChange={(e) => setForm({
-                                                    ...form,
-                                                    sections: { ...form.sections, supportOptions: e.target.value }
-                                                })}
+                                                value={form.format === 'text' ? form.sections.supportOptions : ''}
+                                                onChange={(e) => {
+                                                    if (form.format === 'text') {
+                                                        setForm({
+                                                            ...form,
+                                                            sections: { ...form.sections, supportOptions: e.target.value },
+                                                        });
+                                                    }
+                                                }}
                                                 placeholder="Describe available support packages and maintenance options..."
-                                                className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                                                className="flex min-h-[100px] w-full resize-none rounded-md border border-input bg-background px-3 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                             />
                                         </div>
 
-                                        {errors.quotation_content && <p className="text-sm text-red-500 mt-1">{errors.quotation_content}</p>}
+                                        {errors.quotation_content && <p className="mt-1 text-sm text-red-500">{errors.quotation_content}</p>}
                                     </div>
                                 )}
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4 text-sm pt-4 border-t">
+                            <div className="grid grid-cols-2 gap-4 border-t pt-4 text-sm">
                                 <div className="flex flex-col">
-                                    <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Created Date</span>
+                                    <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Created Date</span>
                                     <span className="font-medium">{new Date(quotation.created_at).toLocaleDateString()}</span>
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Last Updated</span>
+                                    <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Last Updated</span>
                                     <span className="font-medium">{new Date(quotation.updated_at).toLocaleDateString()}</span>
                                 </div>
                             </div>
@@ -1480,25 +1782,25 @@ export default function EditQuotation({ quotation }: { quotation: Quotation }) {
 
                     <Card className="border shadow-sm">
                         <CardContent className="pt-6">
-                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                                 <div className="space-y-1">
-                                    <h4 className="font-bold text-lg text-foreground">Save Changes</h4>
+                                    <h4 className="text-lg font-bold text-foreground">Save Changes</h4>
                                     <p className="text-sm text-muted-foreground">Review your changes before saving</p>
                                 </div>
-                                <Button 
-                                    type="submit" 
+                                <Button
+                                    type="submit"
                                     disabled={isSubmitting}
-                                    className="gap-2 min-w-[150px] h-11 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+                                    className="h-11 min-w-[150px] gap-2 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
                                     size="lg"
                                 >
                                     {isSubmitting ? (
                                         <>
-                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            <Loader2 className="h-4 w-4 animate-spin" />
                                             Saving...
                                         </>
                                     ) : (
                                         <>
-                                            <Save className="w-4 h-4" />
+                                            <Save className="h-4 w-4" />
                                             Save Changes
                                         </>
                                     )}

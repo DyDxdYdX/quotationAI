@@ -187,6 +187,9 @@
         @if($quotation->client)
         {{ $quotation->client->supervisor_name }}<br>
         <strong>{{ $quotation->client->company_name }}</strong><br>
+        @if($quotation->client->company_registration_number)
+        Registration No.: {{ $quotation->client->company_registration_number }}<br>
+        @endif
         Email: {{ $quotation->client->company_email }}<br>
         Tel: {{ $quotation->client->company_phone_number }}
         @endif

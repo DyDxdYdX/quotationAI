@@ -51,7 +51,7 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
                     <HeadingSmall title="Profile information" description="Update your name, phone number and email address" />
 
                     <div className="rounded-lg border bg-card shadow-sm">
-                        <form onSubmit={submit} className="p-6 space-y-6">
+                        <form onSubmit={submit} className="space-y-6 p-6">
                             <div className="grid gap-2">
                                 <Label htmlFor="name">Name</Label>
 
@@ -121,8 +121,10 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
                                 </div>
                             )}
 
-                            <div className="flex items-center gap-4 pt-4 border-t">
-                                <Button disabled={processing} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">Save</Button>
+                            <div className="flex items-center gap-4 border-t pt-4">
+                                <Button disabled={processing} className="bg-primary text-primary-foreground shadow-sm hover:bg-primary/90">
+                                    Save
+                                </Button>
 
                                 <Transition
                                     show={recentlySuccessful}

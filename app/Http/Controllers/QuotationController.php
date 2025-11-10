@@ -19,17 +19,38 @@ class QuotationController extends Controller
     public function index(Request $request)
     {
         $per_page = $request->input('per_page', 10);
+        $search = $request->input('search', '');
+        
+        $query = Quotation::with(['client', 'quotationRequest']);
+        
+        // Apply search filter
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                // Search by quotation ID
+                $q->where('id', 'like', '%' . $search . '%')
+                    // Search by client company name
+                    ->orWhereHas('client', function ($clientQuery) use ($search) {
+                        $clientQuery->where('company_name', 'like', '%' . $search . '%')
+                            ->orWhere('supervisor_name', 'like', '%' . $search . '%')
+                            ->orWhere('company_email', 'like', '%' . $search . '%');
+                    })
+                    // Search by service type
+                    ->orWhereHas('quotationRequest', function ($requestQuery) use ($search) {
+                        $requestQuery->where('service_type', 'like', '%' . $search . '%');
+                    })
+                    // Search by status
+                    ->orWhere('quotation_status', 'like', '%' . $search . '%');
+            });
+        }
         
         if ($per_page === 'all') {
-            $quotations = Quotation::with(['client', 'quotationRequest'])
-                ->orderBy('created_at', 'desc')
-                ->get();
+            $quotations = $query->orderBy('created_at', 'desc')->get();
             
             $paginatedQuotations = (object) [
                 'data' => $quotations,
                 'current_page' => 1,
                 'last_page' => 1,
-                'per_page' => $quotations->count(),
+                'per_page' => $quotations->count() ?: 1,
                 'total' => $quotations->count(),
                 'from' => $quotations->count() > 0 ? 1 : null,
                 'to' => $quotations->count(),
@@ -40,9 +61,13 @@ class QuotationController extends Controller
                 ]
             ];
         } else {
-            $paginatedQuotations = Quotation::with(['client', 'quotationRequest'])
-                ->orderBy('created_at', 'desc')
-                ->paginate((int) $per_page);
+            $paginatedQuotations = $query->orderBy('created_at', 'desc')->paginate((int) $per_page);
+            
+            // Add search to pagination links
+            $paginatedQuotations->appends([
+                'per_page' => $per_page,
+                'search' => $search
+            ]);
         }
 
         $clients = Client::orderBy('company_name')->get();
@@ -51,6 +76,7 @@ class QuotationController extends Controller
         return Inertia::render('quotation/index', [
             'quotations' => $paginatedQuotations,
             'per_page_request' => $per_page,
+            'search_request' => $search,
             'clients' => $clients,
             'quotation_requests' => $quotationRequests,
         ]);

@@ -4,10 +4,9 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
 import { Toaster } from '@/components/ui/sonner';
 import { type BreadcrumbItem } from '@/types';
-import { type PropsWithChildren } from 'react';
 import { usePage } from '@inertiajs/react';
+import { useEffect, type PropsWithChildren } from 'react';
 import { toast } from 'sonner';
-import { useEffect } from 'react';
 
 export default function AppSidebarLayout({ children, breadcrumbs = [] }: PropsWithChildren<{ breadcrumbs?: BreadcrumbItem[] }>) {
     const { props } = usePage();

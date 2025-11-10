@@ -57,7 +57,7 @@ export default function Password() {
                     <HeadingSmall title="Update password" description="Ensure your account is using a long, random password to stay secure" />
 
                     <div className="rounded-lg border bg-card shadow-sm">
-                        <form onSubmit={updatePassword} className="p-6 space-y-6">
+                        <form onSubmit={updatePassword} className="space-y-6 p-6">
                             <div className="grid gap-2">
                                 <Label htmlFor="current_password">Current password</Label>
 
@@ -108,8 +108,10 @@ export default function Password() {
                                 <InputError message={errors.password_confirmation} />
                             </div>
 
-                            <div className="flex items-center gap-4 pt-4 border-t">
-                                <Button disabled={processing} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">Save password</Button>
+                            <div className="flex items-center gap-4 border-t pt-4">
+                                <Button disabled={processing} className="bg-primary text-primary-foreground shadow-sm hover:bg-primary/90">
+                                    Save password
+                                </Button>
 
                                 <Transition
                                     show={recentlySuccessful}

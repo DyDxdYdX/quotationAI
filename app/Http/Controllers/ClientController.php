@@ -15,22 +15,40 @@ class ClientController extends Controller
     public function index(Request $request)
     {
         $perPageRequest = $request->get('per_page', 10);
+        $search = $request->get('search', '');
         $perPage = $perPageRequest;
         
-        if ($perPageRequest == 'all') {
-            $perPage = Client::count();
+        $query = Client::with(['quotationRequests', 'quotations']);
+        
+        // Apply search filter
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('company_name', 'like', '%' . $search . '%')
+                    ->orWhere('supervisor_name', 'like', '%' . $search . '%')
+                    ->orWhere('company_email', 'like', '%' . $search . '%')
+                    ->orWhere('company_phone_number', 'like', '%' . $search . '%')
+                    ->orWhere('company_city', 'like', '%' . $search . '%')
+                    ->orWhere('company_address', 'like', '%' . $search . '%')
+                    ->orWhere('company_registration_number', 'like', '%' . $search . '%');
+            });
         }
         
-        $clients = Client::with(['quotationRequests', 'quotations'])
-            ->orderBy('company_name', 'asc')
-            ->paginate($perPage);
+        if ($perPageRequest == 'all') {
+            $perPage = $query->count() ?: 1;
+        }
         
-        // Add the original per_page request value to the response
-        $clients->appends(['per_page' => $perPageRequest]);
+        $clients = $query->orderBy('company_name', 'asc')->paginate($perPage);
+        
+        // Add query parameters to pagination links
+        $clients->appends([
+            'per_page' => $perPageRequest,
+            'search' => $search
+        ]);
         
         return Inertia::render('client/index', [
             'clients' => $clients,
-            'per_page_request' => $perPageRequest
+            'per_page_request' => $perPageRequest,
+            'search_request' => $search
         ]);
     }
 
@@ -54,10 +72,13 @@ class ClientController extends Controller
             'company_name' => 'required|string|max:255',
             'company_address' => 'required|string|max:255',
             'company_city' => 'required|string|max:255',
+            'company_registration_number' => 'required|string|max:255',
         ]);
 
         try {
-            $client = Client::create($request->all());
+            $data = $request->all();
+            $data['user_id'] = $request->user()->id;
+            $client = Client::create($data);
             return redirect()->back()->with('success', 'Client created successfully');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to create client: ' . $e->getMessage());
@@ -97,6 +118,7 @@ class ClientController extends Controller
             'company_name' => 'required|string|max:255',
             'company_address' => 'required|string|max:255',
             'company_city' => 'required|string|max:255',
+            'company_registration_number' => 'required|string|max:255',
         ]);
 
         try {

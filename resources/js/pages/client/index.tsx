@@ -1,44 +1,25 @@
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
-import {
-    Card,
-    CardContent,
-    CardHeader,
-} from "@/components/ui/card";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-import { EyeIcon, PencilIcon, TrashIcon, PlusIcon } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { 
-    Pagination, 
-    PaginationContent, 
-    PaginationItem, 
-    PaginationLink, 
-    PaginationPrevious, 
-    PaginationNext, 
-    PaginationEllipsis 
-} from '@/components/ui/pagination';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-    Dialog, 
-    DialogContent, 
-    DialogHeader, 
-    DialogTitle, 
-    DialogFooter 
-} from '@/components/ui/dialog';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { router } from '@inertiajs/react';
-import { useState } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import {
+    Pagination,
+    PaginationContent,
+    PaginationEllipsis,
+    PaginationItem,
+    PaginationLink,
+    PaginationNext,
+    PaginationPrevious,
+} from '@/components/ui/pagination';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import { AlertTriangle, EyeIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -55,6 +36,7 @@ interface Client {
     company_name: string;
     company_address: string;
     company_city: string;
+    company_registration_number: string;
     quotation_requests?: Array<{
         id: number;
         service_type: string;
@@ -84,7 +66,7 @@ interface PaginatedClients {
     }>;
 }
 
-export default function Client({ clients, per_page_request }: { clients: PaginatedClients; per_page_request: string }) {
+export default function Client({ clients, per_page_request, search_request = '' }: { clients: PaginatedClients; per_page_request: string; search_request?: string }) {
     const [viewDialogOpen, setViewDialogOpen] = useState(false);
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -97,6 +79,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
         company_name: '',
         company_address: '',
         company_city: '',
+        company_registration_number: '',
     });
     const [createForm, setCreateForm] = useState({
         supervisor_name: '',
@@ -105,8 +88,44 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
         company_name: '',
         company_address: '',
         company_city: '',
+        company_registration_number: '',
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [search, setSearch] = useState(search_request);
+    const [searchInput, setSearchInput] = useState(search_request);
+
+    // Update search input when search_request prop changes
+    useEffect(() => {
+        setSearch(search_request);
+        setSearchInput(search_request);
+    }, [search_request]);
+
+    const handleSearch = (e: React.FormEvent) => {
+        e.preventDefault();
+        setSearch(searchInput);
+        router.get(
+            window.location.pathname,
+            {
+                search: searchInput,
+                per_page: per_page_request,
+                page: 1,
+            },
+            { preserveState: false },
+        );
+    };
+
+    const handleClearSearch = () => {
+        setSearchInput('');
+        setSearch('');
+        router.get(
+            window.location.pathname,
+            {
+                per_page: per_page_request,
+                page: 1,
+            },
+            { preserveState: false },
+        );
+    };
 
     const clientSummary = [
         {
@@ -132,6 +151,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
             company_name: '',
             company_address: '',
             company_city: '',
+            company_registration_number: '',
         });
         setCreateDialogOpen(true);
     };
@@ -145,6 +165,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
             company_name: client.company_name,
             company_address: client.company_address,
             company_city: client.company_city,
+            company_registration_number: client.company_registration_number,
         });
         setEditDialogOpen(true);
     };
@@ -168,11 +189,12 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                     company_name: '',
                     company_address: '',
                     company_city: '',
+                    company_registration_number: '',
                 });
             },
             onFinish: () => {
                 setIsSubmitting(false);
-            }
+            },
         });
     };
 
@@ -188,7 +210,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
             },
             onFinish: () => {
                 setIsSubmitting(false);
-            }
+            },
         });
     };
 
@@ -203,33 +225,26 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
             },
             onFinish: () => {
                 setIsSubmitting(false);
-            }
+            },
         });
     };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Manage Client" />
-            
+
             {/* Client Summary Cards */}
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-6 px-6 py-4'>
+            <div className="grid grid-cols-1 gap-6 px-6 py-4 md:grid-cols-2">
                 {clientSummary.map((summary, index) => {
-                    const colors = [
-                        'from-blue-500 to-blue-600',
-                        'from-purple-500 to-purple-600',
-                    ];
+                    const colors = ['from-blue-500 to-blue-600', 'from-purple-500 to-purple-600'];
                     return (
-                        <Card key={index} className='border-0 shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden'>
+                        <Card key={index} className="overflow-hidden border-0 shadow-md transition-shadow duration-300 hover:shadow-lg">
                             <div className={`h-1.5 bg-gradient-to-r ${colors[index % colors.length]}`} />
-                            <CardHeader className='pb-2'>
-                                <p className='text-sm font-medium text-muted-foreground uppercase tracking-wide'>
-                                    {summary.title}
-                                </p>
+                            <CardHeader className="pb-2">
+                                <p className="text-sm font-medium tracking-wide text-muted-foreground uppercase">{summary.title}</p>
                             </CardHeader>
                             <CardContent>
-                                <p className='text-3xl font-bold text-foreground'>
-                                    {summary.value}
-                                </p>
+                                <p className="text-3xl font-bold text-foreground">{summary.value}</p>
                             </CardContent>
                         </Card>
                     );
@@ -237,95 +252,136 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
             </div>
 
             {/* Client Table */}
-            <div className='px-6 pb-6'>
-                <Card className='border shadow-sm'>
-                    <CardHeader className='flex flex-row items-center justify-between border-b bg-muted/30'>
+            <div className="px-6 pb-6">
+                <Card className="border shadow-sm">
+                    <CardHeader className="flex flex-row items-center justify-between border-b bg-muted/30">
                         <div>
-                            <h2 className='text-2xl font-bold text-foreground'>Clients</h2>
-                            <p className='text-sm text-muted-foreground mt-1'>Manage and track all client information</p>
+                            <h2 className="text-2xl font-bold text-foreground">Clients</h2>
+                            <p className="mt-1 text-sm text-muted-foreground">Manage and track all client information</p>
                         </div>
-                        <Button onClick={handleCreate} className='flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm'>
-                            <PlusIcon className='w-4 h-4' />
+                        <Button
+                            onClick={handleCreate}
+                            className="flex items-center gap-2 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+                        >
+                            <PlusIcon className="h-4 w-4" />
                             Add New Client
                         </Button>
                     </CardHeader>
-                    <CardContent className='p-0'>
-                        {clients.data.length === 0 ? (
-                            <div className='text-center py-16'>
-                                <div className='mx-auto w-24 h-24 rounded-full bg-muted flex items-center justify-center mb-4'>
-                                    <PlusIcon className='w-12 h-12 text-muted-foreground' />
+                    <CardContent className="p-0">
+                        {/* Search Bar */}
+                        <div className="border-b px-4 py-4">
+                            <form onSubmit={handleSearch} className="flex gap-2">
+                                <div className="relative flex-1">
+                                    <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Input
+                                        type="text"
+                                        placeholder="Search clients by company name, supervisor, email, phone, city, address, or registration number..."
+                                        value={searchInput}
+                                        onChange={(e) => setSearchInput(e.target.value)}
+                                        className="pl-9 pr-9"
+                                    />
+                                    {searchInput && (
+                                        <button
+                                            type="button"
+                                            onClick={handleClearSearch}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    )}
                                 </div>
-                                <p className='text-lg font-medium text-foreground mb-2'>No clients found</p>
-                                <p className='text-sm text-muted-foreground mb-6'>Get started by adding your first client</p>
-                                <Button onClick={handleCreate} className='gap-2'>
-                                    <PlusIcon className='w-4 h-4' />
+                                <Button type="submit" variant="default" className="gap-2">
+                                    <SearchIcon className="h-4 w-4" />
+                                    Search
+                                </Button>
+                                {search && (
+                                    <Button type="button" variant="outline" onClick={handleClearSearch} className="gap-2">
+                                        Clear
+                                    </Button>
+                                )}
+                            </form>
+                            {search && (
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                    Showing results for: <span className="font-medium text-foreground">&quot;{search}&quot;</span> ({clients.total} {clients.total === 1 ? 'result' : 'results'})
+                                </p>
+                            )}
+                        </div>
+                        {clients.data.length === 0 ? (
+                            <div className="py-16 text-center">
+                                <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-muted">
+                                    <PlusIcon className="h-12 w-12 text-muted-foreground" />
+                                </div>
+                                <p className="mb-2 text-lg font-medium text-foreground">No clients found</p>
+                                <p className="mb-6 text-sm text-muted-foreground">Get started by adding your first client</p>
+                                <Button onClick={handleCreate} className="gap-2">
+                                    <PlusIcon className="h-4 w-4" />
                                     Add New Client
                                 </Button>
                             </div>
                         ) : (
                             <>
-                                <div className='overflow-x-auto px-4'>
+                                <div className="overflow-x-auto px-4">
                                     <Table>
                                         <TableHeader>
-                                            <TableRow className='border-b bg-muted/50 hover:bg-muted/50'>
-                                                <TableHead className='h-12 font-semibold text-sm text-foreground'>Company Name</TableHead>
-                                                <TableHead className='h-12 font-semibold text-sm text-foreground'>Supervisor</TableHead>
-                                                <TableHead className='h-12 font-semibold text-sm text-foreground'>Email</TableHead>
-                                                <TableHead className='h-12 font-semibold text-sm text-foreground'>Phone</TableHead>
-                                                <TableHead className='h-12 font-semibold text-sm text-foreground'>City</TableHead>
-                                                <TableHead className='h-12 font-semibold text-sm text-foreground'>Quotations</TableHead>
-                                                <TableHead className='h-12 font-semibold text-sm text-foreground text-right'>Actions</TableHead>
+                                            <TableRow className="border-b bg-muted/50 hover:bg-muted/50">
+                                                <TableHead className="h-12 text-sm font-semibold text-foreground">Company Name</TableHead>
+                                                <TableHead className="h-12 text-sm font-semibold text-foreground">Supervisor</TableHead>
+                                                <TableHead className="h-12 text-sm font-semibold text-foreground">Email</TableHead>
+                                                <TableHead className="h-12 text-sm font-semibold text-foreground">Phone</TableHead>
+                                                <TableHead className="h-12 text-sm font-semibold text-foreground">City</TableHead>
+                                                <TableHead className="h-12 text-sm font-semibold text-foreground">Quotations</TableHead>
+                                                <TableHead className="h-12 text-right text-sm font-semibold text-foreground">Actions</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                             {clients.data.map((client) => (
-                                                <TableRow key={client.id} className='border-b hover:bg-muted/30 transition-colors duration-150'>
-                                                    <TableCell className='py-4'>
-                                                        <span className='font-medium text-foreground'>{client.company_name}</span>
+                                                <TableRow key={client.id} className="border-b transition-colors duration-150 hover:bg-muted/30">
+                                                    <TableCell className="py-4">
+                                                        <span className="font-medium text-foreground">{client.company_name}</span>
                                                     </TableCell>
-                                                    <TableCell className='py-4'>
-                                                        <span className='text-sm text-muted-foreground'>{client.supervisor_name}</span>
+                                                    <TableCell className="py-4">
+                                                        <span className="text-sm text-muted-foreground">{client.supervisor_name}</span>
                                                     </TableCell>
-                                                    <TableCell className='py-4'>
-                                                        <span className='text-sm text-muted-foreground'>{client.company_email}</span>
+                                                    <TableCell className="py-4">
+                                                        <span className="text-sm text-muted-foreground">{client.company_email}</span>
                                                     </TableCell>
-                                                    <TableCell className='py-4'>
-                                                        <span className='text-sm text-muted-foreground'>{client.company_phone_number}</span>
+                                                    <TableCell className="py-4">
+                                                        <span className="text-sm text-muted-foreground">{client.company_phone_number}</span>
                                                     </TableCell>
-                                                    <TableCell className='py-4'>
-                                                        <span className='text-sm text-muted-foreground'>{client.company_city}</span>
+                                                    <TableCell className="py-4">
+                                                        <span className="text-sm text-muted-foreground">{client.company_city}</span>
                                                     </TableCell>
-                                                    <TableCell className='py-4'>
-                                                        <span className='text-sm font-medium text-foreground'>{client.quotations?.length || 0}</span>
+                                                    <TableCell className="py-4">
+                                                        <span className="text-sm font-medium text-foreground">{client.quotations?.length || 0}</span>
                                                     </TableCell>
-                                                    <TableCell className='py-4'>
+                                                    <TableCell className="py-4">
                                                         <div className="flex items-center justify-end gap-2">
-                                                            <Button 
-                                                                variant='ghost' 
-                                                                size='sm'
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
                                                                 onClick={() => handleView(client)}
                                                                 className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
                                                                 title="View Client"
                                                             >
-                                                                <EyeIcon className='w-4 h-4' />
+                                                                <EyeIcon className="h-4 w-4" />
                                                             </Button>
-                                                            <Button 
-                                                                variant='ghost' 
-                                                                size='sm'
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
                                                                 onClick={() => handleEdit(client)}
                                                                 className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
                                                                 title="Edit Client"
                                                             >
-                                                                <PencilIcon className='w-4 h-4' />
+                                                                <PencilIcon className="h-4 w-4" />
                                                             </Button>
-                                                            <Button 
-                                                                variant='ghost' 
-                                                                size='sm'
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
                                                                 onClick={() => handleDelete(client)}
                                                                 className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
                                                                 title="Delete Client"
                                                             >
-                                                                <TrashIcon className='w-4 h-4' />
+                                                                <TrashIcon className="h-4 w-4" />
                                                             </Button>
                                                         </div>
                                                     </TableCell>
@@ -334,22 +390,27 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                                         </TableBody>
                                     </Table>
                                 </div>
-                                
+
                                 {/* Pagination */}
-                                <div className='border-t bg-muted/30 px-6 py-4'>
-                                    <div className='flex flex-col sm:flex-row items-center justify-between gap-4'>
-                                        <div className='flex items-center gap-2'>
-                                            <span className='text-sm text-muted-foreground'>Show</span>
+                                <div className="border-t bg-muted/30 px-6 py-4">
+                                    <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm text-muted-foreground">Show</span>
                                             <Select
                                                 value={per_page_request.toString()}
                                                 onValueChange={(value) => {
-                                                    router.get(window.location.pathname, {
-                                                        per_page: value,
-                                                        page: 1
-                                                    }, { preserveState: true })
+                                                    router.get(
+                                                        window.location.pathname,
+                                                        {
+                                                            per_page: value,
+                                                            page: 1,
+                                                            search: search,
+                                                        },
+                                                        { preserveState: true },
+                                                    );
                                                 }}
                                             >
-                                                <SelectTrigger className='w-20 h-8'>
+                                                <SelectTrigger className="h-8 w-20">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -359,25 +420,32 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                                                     <SelectItem value="all">All</SelectItem>
                                                 </SelectContent>
                                             </Select>
-                                            <span className='text-sm text-muted-foreground'>entries</span>
+                                            <span className="text-sm text-muted-foreground">entries</span>
                                         </div>
-                                        <div className='text-sm text-muted-foreground'>
-                                            Showing <span className='font-medium text-foreground'>{clients.from}</span> to <span className='font-medium text-foreground'>{clients.to}</span> of <span className='font-medium text-foreground'>{clients.total}</span> results
+                                        <div className="text-sm text-muted-foreground">
+                                            Showing <span className="font-medium text-foreground">{clients.from}</span> to{' '}
+                                            <span className="font-medium text-foreground">{clients.to}</span> of{' '}
+                                            <span className="font-medium text-foreground">{clients.total}</span> results
                                         </div>
                                     </div>
-                                    <div className='flex justify-center'>
+                                    <div className="flex justify-center">
                                         <Pagination>
                                             <PaginationContent>
                                                 <PaginationItem>
-                                                    <PaginationPrevious 
+                                                    <PaginationPrevious
                                                         href="#"
                                                         onClick={(e) => {
                                                             e.preventDefault();
                                                             if (clients.current_page > 1) {
-                                                                router.get(window.location.pathname, {
-                                                                page: clients.current_page - 1,
-                                                                per_page: per_page_request
-                                                            }, { preserveState: true });
+                                                                router.get(
+                                                                    window.location.pathname,
+                                                                    {
+                                                                        page: clients.current_page - 1,
+                                                                        per_page: per_page_request,
+                                                                        search: search,
+                                                                    },
+                                                                    { preserveState: true },
+                                                                );
                                                             }
                                                         }}
                                                         className={clients.current_page <= 1 ? 'pointer-events-none opacity-50' : ''}
@@ -394,17 +462,22 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                                                     }
 
                                                     const pageNumber = parseInt(link.label);
-                                                    
+
                                                     return (
                                                         <PaginationItem key={index}>
                                                             <PaginationLink
                                                                 href="#"
                                                                 onClick={(e) => {
                                                                     e.preventDefault();
-                                                                    router.get(window.location.pathname, {
-                                                                        page: pageNumber,
-                                                                        per_page: per_page_request
-                                                                    }, { preserveState: true });
+                                                                    router.get(
+                                                                        window.location.pathname,
+                                                                        {
+                                                                            page: pageNumber,
+                                                                            per_page: per_page_request,
+                                                                            search: search,
+                                                                        },
+                                                                        { preserveState: true },
+                                                                    );
                                                                 }}
                                                                 isActive={link.active}
                                                             >
@@ -415,15 +488,20 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                                                 })}
 
                                                 <PaginationItem>
-                                                    <PaginationNext 
+                                                    <PaginationNext
                                                         href="#"
                                                         onClick={(e) => {
                                                             e.preventDefault();
                                                             if (clients.current_page < clients.last_page) {
-                                                                router.get(window.location.pathname, {
-                                                                    page: clients.current_page + 1,
-                                                                    per_page: per_page_request
-                                                                }, { preserveState: true });
+                                                                router.get(
+                                                                    window.location.pathname,
+                                                                    {
+                                                                        page: clients.current_page + 1,
+                                                                        per_page: per_page_request,
+                                                                        search: search,
+                                                                    },
+                                                                    { preserveState: true },
+                                                                );
                                                             }
                                                         }}
                                                         className={clients.current_page >= clients.last_page ? 'pointer-events-none opacity-50' : ''}
@@ -441,7 +519,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
 
             {/* View Client Dialog */}
             <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-bold">Client Details</DialogTitle>
                     </DialogHeader>
@@ -451,6 +529,10 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                                 <div>
                                     <Label className="text-sm font-medium text-muted-foreground">Company Name</Label>
                                     <p className="text-sm font-medium">{selectedClient.company_name}</p>
+                                </div>
+                                <div>
+                                    <Label className="text-sm font-medium text-muted-foreground">Company Registration Number</Label>
+                                    <p className="text-sm">{selectedClient.company_registration_number}</p>
                                 </div>
                                 <div>
                                     <Label className="text-sm font-medium text-muted-foreground">Supervisor</Label>
@@ -468,12 +550,12 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                                     <Label className="text-sm font-medium text-muted-foreground">City</Label>
                                     <p className="text-sm">{selectedClient.company_city}</p>
                                 </div>
-                                <div>
+                                <div className="col-span-2">
                                     <Label className="text-sm font-medium text-muted-foreground">Address</Label>
                                     <p className="text-sm">{selectedClient.company_address}</p>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                            <div className="grid grid-cols-2 gap-4 border-t pt-4">
                                 <div>
                                     <Label className="text-sm font-medium text-muted-foreground">Total Quotations</Label>
                                     <p className="text-sm font-medium">{selectedClient.quotations?.length || 0}</p>
@@ -491,7 +573,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
 
             {/* Create Client Dialog */}
             <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-bold">Add New Client</DialogTitle>
                     </DialogHeader>
@@ -502,7 +584,16 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                                 <Input
                                     id="create_company_name"
                                     value={createForm.company_name}
-                                    onChange={(e) => setCreateForm({...createForm, company_name: e.target.value})}
+                                    onChange={(e) => setCreateForm({ ...createForm, company_name: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="create_company_registration_number">Company Registration Number *</Label>
+                                <Input
+                                    id="create_company_registration_number"
+                                    value={createForm.company_registration_number}
+                                    onChange={(e) => setCreateForm({ ...createForm, company_registration_number: e.target.value })}
                                     required
                                 />
                             </div>
@@ -511,7 +602,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                                 <Input
                                     id="create_supervisor_name"
                                     value={createForm.supervisor_name}
-                                    onChange={(e) => setCreateForm({...createForm, supervisor_name: e.target.value})}
+                                    onChange={(e) => setCreateForm({ ...createForm, supervisor_name: e.target.value })}
                                     required
                                 />
                             </div>
@@ -521,7 +612,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                                     id="create_company_email"
                                     type="email"
                                     value={createForm.company_email}
-                                    onChange={(e) => setCreateForm({...createForm, company_email: e.target.value})}
+                                    onChange={(e) => setCreateForm({ ...createForm, company_email: e.target.value })}
                                     required
                                 />
                             </div>
@@ -530,7 +621,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                                 <Input
                                     id="create_company_phone_number"
                                     value={createForm.company_phone_number}
-                                    onChange={(e) => setCreateForm({...createForm, company_phone_number: e.target.value})}
+                                    onChange={(e) => setCreateForm({ ...createForm, company_phone_number: e.target.value })}
                                     required
                                 />
                             </div>
@@ -539,30 +630,29 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                                 <Input
                                     id="create_company_city"
                                     value={createForm.company_city}
-                                    onChange={(e) => setCreateForm({...createForm, company_city: e.target.value})}
+                                    onChange={(e) => setCreateForm({ ...createForm, company_city: e.target.value })}
                                     required
                                 />
                             </div>
-                            <div>
+                            <div className="col-span-2">
                                 <Label htmlFor="create_company_address">Address *</Label>
                                 <Input
                                     id="create_company_address"
                                     value={createForm.company_address}
-                                    onChange={(e) => setCreateForm({...createForm, company_address: e.target.value})}
+                                    onChange={(e) => setCreateForm({ ...createForm, company_address: e.target.value })}
                                     required
                                 />
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button 
-                                type="button" 
-                                variant="outline" 
-                                onClick={() => setCreateDialogOpen(false)}
-                                disabled={isSubmitting}
-                            >
+                            <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)} disabled={isSubmitting}>
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
+                            <Button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+                            >
                                 {isSubmitting ? 'Creating...' : 'Create Client'}
                             </Button>
                         </DialogFooter>
@@ -572,7 +662,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
 
             {/* Edit Client Dialog */}
             <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-bold">Edit Client</DialogTitle>
                     </DialogHeader>
@@ -583,7 +673,16 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                                 <Input
                                     id="company_name"
                                     value={editForm.company_name}
-                                    onChange={(e) => setEditForm({...editForm, company_name: e.target.value})}
+                                    onChange={(e) => setEditForm({ ...editForm, company_name: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="company_registration_number">Company Registration Number *</Label>
+                                <Input
+                                    id="company_registration_number"
+                                    value={editForm.company_registration_number}
+                                    onChange={(e) => setEditForm({ ...editForm, company_registration_number: e.target.value })}
                                     required
                                 />
                             </div>
@@ -592,7 +691,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                                 <Input
                                     id="supervisor_name"
                                     value={editForm.supervisor_name}
-                                    onChange={(e) => setEditForm({...editForm, supervisor_name: e.target.value})}
+                                    onChange={(e) => setEditForm({ ...editForm, supervisor_name: e.target.value })}
                                     required
                                 />
                             </div>
@@ -602,7 +701,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                                     id="company_email"
                                     type="email"
                                     value={editForm.company_email}
-                                    onChange={(e) => setEditForm({...editForm, company_email: e.target.value})}
+                                    onChange={(e) => setEditForm({ ...editForm, company_email: e.target.value })}
                                     required
                                 />
                             </div>
@@ -611,7 +710,7 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                                 <Input
                                     id="company_phone_number"
                                     value={editForm.company_phone_number}
-                                    onChange={(e) => setEditForm({...editForm, company_phone_number: e.target.value})}
+                                    onChange={(e) => setEditForm({ ...editForm, company_phone_number: e.target.value })}
                                     required
                                 />
                             </div>
@@ -620,30 +719,29 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                                 <Input
                                     id="company_city"
                                     value={editForm.company_city}
-                                    onChange={(e) => setEditForm({...editForm, company_city: e.target.value})}
+                                    onChange={(e) => setEditForm({ ...editForm, company_city: e.target.value })}
                                     required
                                 />
                             </div>
-                            <div>
+                            <div className="col-span-2">
                                 <Label htmlFor="company_address">Address *</Label>
                                 <Input
                                     id="company_address"
                                     value={editForm.company_address}
-                                    onChange={(e) => setEditForm({...editForm, company_address: e.target.value})}
+                                    onChange={(e) => setEditForm({ ...editForm, company_address: e.target.value })}
                                     required
                                 />
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button 
-                                type="button" 
-                                variant="outline" 
-                                onClick={() => setEditDialogOpen(false)}
-                                disabled={isSubmitting}
-                            >
+                            <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)} disabled={isSubmitting}>
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
+                            <Button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+                            >
                                 {isSubmitting ? 'Updating...' : 'Update Client'}
                             </Button>
                         </DialogFooter>
@@ -672,18 +770,10 @@ export default function Client({ clients, per_page_request }: { clients: Paginat
                         </div>
                     )}
                     <DialogFooter>
-                        <Button 
-                            variant="outline" 
-                            onClick={() => setDeleteDialogOpen(false)}
-                            disabled={isSubmitting}
-                        >
+                        <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isSubmitting}>
                             Cancel
                         </Button>
-                        <Button 
-                            variant="destructive" 
-                            onClick={confirmDelete}
-                            disabled={isSubmitting}
-                        >
+                        <Button variant="destructive" onClick={confirmDelete} disabled={isSubmitting}>
                             {isSubmitting ? 'Deleting...' : 'Delete Client'}
                         </Button>
                     </DialogFooter>

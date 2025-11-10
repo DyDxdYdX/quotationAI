@@ -36,7 +36,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         <div className="px-6 py-4">
             <Heading title="Settings" description="Manage your profile and account settings" />
 
-            <div className="flex flex-col space-y-8 lg:flex-row lg:space-y-0 lg:space-x-12 mt-6">
+            <div className="mt-6 flex flex-col space-y-8 lg:flex-row lg:space-y-0 lg:space-x-12">
                 <aside className="w-full max-w-xl lg:w-48">
                     <nav className="flex flex-col space-y-1">
                         {sidebarNavItems.map((item, index) => (

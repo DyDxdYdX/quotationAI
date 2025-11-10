@@ -22,7 +22,7 @@ export default function Appearance() {
             <SettingsLayout>
                 <div className="space-y-6">
                     <HeadingSmall title="Appearance settings" description="Update your account's appearance settings" />
-                    <div className="rounded-lg border bg-card shadow-sm p-6">
+                    <div className="rounded-lg border bg-card p-6 shadow-sm">
                         <AppearanceTabs />
                     </div>
                 </div>

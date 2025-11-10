@@ -3,9 +3,9 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, usePage } from '@inertiajs/react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, LabelList, Legend } from 'recharts';
-import { Calendar, Clock, TrendingUp, Users, FileText, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
-import { useState, useEffect, useMemo } from 'react';
+import { AlertCircle, Calendar, CheckCircle, Clock, FileText, TrendingUp, Users, XCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Bar, BarChart, CartesianGrid, Cell, LabelList, Legend, Pie, PieChart, XAxis, YAxis, type LegendPayload } from 'recharts';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -39,20 +39,20 @@ interface DashboardPageProps extends SharedData {
 
 const chartConfig = {
     quotations: {
-        label: "Quotations",
-        color: "hsl(var(--chart-1))",
+        label: 'Quotations',
+        color: 'hsl(var(--chart-1))',
     },
     pending: {
-        label: "Pending",
-        color: "hsl(var(--chart-1))",
+        label: 'Pending',
+        color: 'hsl(var(--chart-1))',
     },
     approved: {
-        label: "Approved", 
-        color: "hsl(var(--chart-2))",
+        label: 'Approved',
+        color: 'hsl(var(--chart-2))',
     },
     rejected: {
-        label: "Rejected",
-        color: "hsl(var(--chart-3))",
+        label: 'Rejected',
+        color: 'hsl(var(--chart-3))',
     },
 };
 
@@ -73,7 +73,7 @@ export default function Dashboard() {
             weekday: 'long',
             year: 'numeric',
             month: 'long',
-            day: 'numeric'
+            day: 'numeric',
         });
     };
 
@@ -81,7 +81,7 @@ export default function Dashboard() {
         return date.toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
-            second: '2-digit'
+            second: '2-digit',
         });
     };
 
@@ -133,24 +133,22 @@ export default function Dashboard() {
             }
             return variable;
         }
-        
+
         // Extract the variable name from hsl(var(--chart-1)) or var(--chart-1) format
         const match = variable.match(/var\(--([^)]+)\)/);
         if (!match) {
             // If it's already a valid color (hex, rgb, etc.), return it
             return variable;
         }
-        
+
         const varName = match[1];
-        const computedValue = getComputedStyle(document.documentElement)
-            .getPropertyValue(`--${varName}`)
-            .trim();
-        
+        const computedValue = getComputedStyle(document.documentElement).getPropertyValue(`--${varName}`).trim();
+
         // CSS variables from the theme are hex values like #3b82f6
         if (computedValue) {
             return computedValue;
         }
-        
+
         // Fallback to default colors if CSS variable not found
         const defaultColors: Record<string, string> = {
             'chart-1': '#3b82f6',
@@ -159,48 +157,71 @@ export default function Dashboard() {
             'chart-4': '#f59e0b',
             'chart-5': '#ef4444',
         };
-        
+
         return defaultColors[varName] || variable;
     };
 
     // Transform chart data to use computed colors
     const transformChartData = (data: Array<{ name: string; value: number; fill: string }>) => {
-        return data.map(item => ({
+        return data.map((item) => ({
             ...item,
-            fill: getCSSVariableValue(item.fill)
+            fill: getCSSVariableValue(item.fill),
         }));
     };
 
     const quotationsByStatusData = transformChartData(chartData.quotationsByStatus);
     const serviceTypesData = transformChartData(chartData.serviceTypesData);
-    
+
     // Get computed CSS variable value helper
     const getCSSVar = (varName: string, fallback: string): string => {
         if (typeof window === 'undefined') return fallback;
-        const value = getComputedStyle(document.documentElement)
-            .getPropertyValue(`--${varName}`)
-            .trim();
+        const value = getComputedStyle(document.documentElement).getPropertyValue(`--${varName}`).trim();
         return value || fallback;
     };
-    
+
     // Get colors for charts
     const primaryColor = getCSSVar('primary', '#3b82f6');
     const foregroundColor = getCSSVar('foreground', '#0f172a');
     const mutedForegroundColor = getCSSVar('muted-foreground', '#64748b');
     const borderColor = getCSSVar('border', '#e2e8f0');
-    
+
     const quotationsTotal = getTotalValue(chartData.quotationsByStatus);
     const serviceTypesTotal = getTotalValue(chartData.serviceTypesData);
 
     // Custom label function for pie charts - show value and percentage
-    const createPieLabelFunction = (total: number) => (entry: any) => {
-        if (total === 0 || !entry.value) return '';
-        const percentage = ((entry.value / total) * 100).toFixed(1);
+    const createPieLabelFunction = (total: number) => (props: {
+        value?: number;
+        cx?: number;
+        cy?: number;
+        midAngle?: number;
+        innerRadius?: number;
+        outerRadius?: number;
+        [key: string]: unknown;
+    }) => {
+        const { value, cx, cy, midAngle, innerRadius, outerRadius } = props;
+        if (!value || total === 0) return null;
+        const percentage = ((value / total) * 100).toFixed(1);
         // Only show label if slice is large enough (>5% of total) to avoid clutter
-        if (parseFloat(percentage) > 5) {
-            return `${entry.value} (${percentage}%)`;
-        }
-        return '';
+        if (parseFloat(percentage) <= 5) return null;
+
+        const RADIAN = Math.PI / 180;
+        const radius = (innerRadius || 0) + ((outerRadius || 0) - (innerRadius || 0)) * 0.5;
+        const x = (cx || 0) + radius * Math.cos(-(midAngle || 0) * RADIAN);
+        const y = (cy || 0) + radius * Math.sin(-(midAngle || 0) * RADIAN);
+
+        return (
+            <text
+                x={x}
+                y={y}
+                fill="hsl(var(--foreground))"
+                textAnchor={x > (cx || 0) ? 'start' : 'end'}
+                dominantBaseline="central"
+                fontSize={12}
+                fontWeight={500}
+            >
+                {`${value} (${percentage}%)`}
+            </text>
+        );
     };
 
     return (
@@ -212,7 +233,7 @@ export default function Dashboard() {
                     <Card className="border shadow-sm">
                         <CardContent className="p-6">
                             <div className="flex items-center gap-4">
-                                <div className="p-3 rounded-lg bg-primary/10">
+                                <div className="rounded-lg bg-primary/10 p-3">
                                     <Calendar className="h-6 w-6 text-primary" />
                                 </div>
                                 <div>
@@ -225,11 +246,11 @@ export default function Dashboard() {
                     <Card className="border shadow-sm">
                         <CardContent className="p-6">
                             <div className="flex items-center gap-4">
-                                <div className="p-3 rounded-lg bg-emerald-500/10">
+                                <div className="rounded-lg bg-emerald-500/10 p-3">
                                     <Clock className="h-6 w-6 text-emerald-600" />
                                 </div>
                                 <div>
-                                    <p className="text-2xl font-bold font-mono text-foreground">{formatTime(currentTime)}</p>
+                                    <p className="font-mono text-2xl font-bold text-foreground">{formatTime(currentTime)}</p>
                                     <p className="text-sm text-muted-foreground">Current Time</p>
                                 </div>
                             </div>
@@ -239,58 +260,58 @@ export default function Dashboard() {
 
                 {/* Analytics Cards */}
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                    <Card className="border-0 shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
+                    <Card className="overflow-hidden border-0 shadow-md transition-shadow duration-300 hover:shadow-lg">
                         <div className="h-1.5 bg-gradient-to-r from-blue-500 to-blue-600" />
                         <CardContent className="p-6">
                             <div className="flex items-center gap-4">
-                                <div className="p-3 rounded-lg bg-blue-500/10">
+                                <div className="rounded-lg bg-blue-500/10 p-3">
                                     <Users className="h-6 w-6 text-blue-600" />
                                 </div>
                                 <div>
                                     <p className="text-3xl font-bold text-foreground">{analytics.totalClients}</p>
-                                    <p className="text-sm text-muted-foreground uppercase tracking-wide">Total Clients</p>
+                                    <p className="text-sm tracking-wide text-muted-foreground uppercase">Total Clients</p>
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="border-0 shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
+                    <Card className="overflow-hidden border-0 shadow-md transition-shadow duration-300 hover:shadow-lg">
                         <div className="h-1.5 bg-gradient-to-r from-emerald-500 to-emerald-600" />
                         <CardContent className="p-6">
                             <div className="flex items-center gap-4">
-                                <div className="p-3 rounded-lg bg-emerald-500/10">
+                                <div className="rounded-lg bg-emerald-500/10 p-3">
                                     <FileText className="h-6 w-6 text-emerald-600" />
                                 </div>
                                 <div>
                                     <p className="text-3xl font-bold text-foreground">{analytics.totalQuotations}</p>
-                                    <p className="text-sm text-muted-foreground uppercase tracking-wide">Total Quotations</p>
+                                    <p className="text-sm tracking-wide text-muted-foreground uppercase">Total Quotations</p>
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="border-0 shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
+                    <Card className="overflow-hidden border-0 shadow-md transition-shadow duration-300 hover:shadow-lg">
                         <div className="h-1.5 bg-gradient-to-r from-purple-500 to-purple-600" />
                         <CardContent className="p-6">
                             <div className="flex items-center gap-4">
-                                <div className="p-3 rounded-lg bg-purple-500/10">
+                                <div className="rounded-lg bg-purple-500/10 p-3">
                                     <TrendingUp className="h-6 w-6 text-purple-600" />
                                 </div>
                                 <div>
                                     <p className="text-3xl font-bold text-foreground">{analytics.totalQuotationRequests}</p>
-                                    <p className="text-sm text-muted-foreground uppercase tracking-wide">Total Requests</p>
+                                    <p className="text-sm tracking-wide text-muted-foreground uppercase">Total Requests</p>
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="border-0 shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
+                    <Card className="overflow-hidden border-0 shadow-md transition-shadow duration-300 hover:shadow-lg">
                         <div className="h-1.5 bg-gradient-to-r from-amber-500 to-amber-600" />
                         <CardContent className="p-6">
                             <div className="flex items-center gap-4">
-                                <div className="p-3 rounded-lg bg-amber-500/10">
+                                <div className="rounded-lg bg-amber-500/10 p-3">
                                     <AlertCircle className="h-6 w-6 text-amber-600" />
                                 </div>
                                 <div>
                                     <p className="text-3xl font-bold text-foreground">{analytics.pendingQuotations}</p>
-                                    <p className="text-sm text-muted-foreground uppercase tracking-wide">Pending Quotations</p>
+                                    <p className="text-sm tracking-wide text-muted-foreground uppercase">Pending Quotations</p>
                                 </div>
                             </div>
                         </CardContent>
@@ -323,16 +344,21 @@ export default function Dashboard() {
                                             <Cell key={`cell-${index}`} fill={entry.fill} />
                                         ))}
                                     </Pie>
-                                    <Legend 
-                                        verticalAlign="bottom" 
+                                    <Legend
+                                        verticalAlign="bottom"
                                         height={60}
                                         wrapperStyle={{ paddingTop: '20px' }}
-                                        formatter={(value, entry: any) => {
-                                            const percentage = quotationsTotal > 0 ? ((entry.payload.value / quotationsTotal) * 100).toFixed(1) : '0';
+                                        formatter={(value, entry: LegendPayload) => {
+                                            const payloadValue = entry.payload?.value;
+                                            const numericValue = typeof payloadValue === 'number' ? payloadValue : 0;
+                                            const percentage =
+                                                quotationsTotal > 0 && numericValue > 0
+                                                    ? ((numericValue / quotationsTotal) * 100).toFixed(1)
+                                                    : '0';
                                             return (
                                                 <span style={{ color: 'hsl(var(--foreground))', fontSize: '13px', fontWeight: '500' }}>
                                                     <span style={{ color: entry.color, marginRight: '8px' }}>●</span>
-                                                    {value}: <strong>{entry.payload.value}</strong> ({percentage}%)
+                                                    {value}: <strong>{numericValue}</strong> ({percentage}%)
                                                 </span>
                                             );
                                         }}
@@ -366,16 +392,21 @@ export default function Dashboard() {
                                             <Cell key={`cell-${index}`} fill={entry.fill} />
                                         ))}
                                     </Pie>
-                                    <Legend 
-                                        verticalAlign="bottom" 
+                                    <Legend
+                                        verticalAlign="bottom"
                                         height={60}
                                         wrapperStyle={{ paddingTop: '20px' }}
-                                        formatter={(value, entry: any) => {
-                                            const percentage = serviceTypesTotal > 0 ? ((entry.payload.value / serviceTypesTotal) * 100).toFixed(1) : '0';
+                                        formatter={(value, entry: LegendPayload) => {
+                                            const payloadValue = entry.payload?.value;
+                                            const numericValue = typeof payloadValue === 'number' ? payloadValue : 0;
+                                            const percentage =
+                                                serviceTypesTotal > 0 && numericValue > 0
+                                                    ? ((numericValue / serviceTypesTotal) * 100).toFixed(1)
+                                                    : '0';
                                             return (
                                                 <span style={{ color: 'hsl(var(--foreground))', fontSize: '13px', fontWeight: '500' }}>
                                                     <span style={{ color: entry.color, marginRight: '8px' }}>●</span>
-                                                    {value}: <strong>{entry.payload.value}</strong> ({percentage}%)
+                                                    {value}: <strong>{numericValue}</strong> ({percentage}%)
                                                 </span>
                                             );
                                         }}
@@ -400,9 +431,9 @@ export default function Dashboard() {
                                 <YAxis stroke={mutedForegroundColor} />
                                 <ChartTooltip content={<ChartTooltipContent />} />
                                 <Bar dataKey="quotations" fill={primaryColor} radius={[4, 4, 0, 0]}>
-                                    <LabelList 
-                                        dataKey="quotations" 
-                                        position="top" 
+                                    <LabelList
+                                        dataKey="quotations"
+                                        position="top"
                                         fill={foregroundColor}
                                         style={{ fontSize: '12px', fontWeight: '500' }}
                                     />
@@ -420,33 +451,40 @@ export default function Dashboard() {
                     </CardHeader>
                     <CardContent className="pt-6">
                         <div className="space-y-3">
-                            {recentQuotations.map((quotation: {
-                                id: number;
-                                quotation_status: string;
-                                created_at: string;
-                                client?: { company_name: string };
-                                quotationRequest?: { service_type: string };
-                            }) => (
-                                <div key={quotation.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        {getStatusIcon(quotation.quotation_status)}
-                                        <div>
-                                            <p className="font-medium text-foreground">{quotation.client?.company_name || 'Unknown Client'}</p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {quotation.quotationRequest?.service_type.replace('_', ' ') || 'Unknown Service'}
+                            {recentQuotations.map(
+                                (quotation: {
+                                    id: number;
+                                    quotation_status: string;
+                                    created_at: string;
+                                    client?: { company_name: string };
+                                    quotationRequest?: { service_type: string };
+                                }) => (
+                                    <div
+                                        key={quotation.id}
+                                        className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/30"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            {getStatusIcon(quotation.quotation_status)}
+                                            <div>
+                                                <p className="font-medium text-foreground">{quotation.client?.company_name || 'Unknown Client'}</p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {quotation.quotationRequest?.service_type.replace('_', ' ') || 'Unknown Service'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <span
+                                                className={`rounded-md border px-3 py-1 text-xs font-semibold ${getStatusColor(quotation.quotation_status)}`}
+                                            >
+                                                {quotation.quotation_status.charAt(0).toUpperCase() + quotation.quotation_status.slice(1)}
+                                            </span>
+                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                {new Date(quotation.created_at).toLocaleDateString()}
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <span className={`px-3 py-1 rounded-md text-xs font-semibold border ${getStatusColor(quotation.quotation_status)}`}>
-                                            {quotation.quotation_status.charAt(0).toUpperCase() + quotation.quotation_status.slice(1)}
-                                        </span>
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                            {new Date(quotation.created_at).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
+                                ),
+                            )}
                         </div>
                     </CardContent>
                 </Card>

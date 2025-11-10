@@ -1,33 +1,17 @@
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 // Using HTML textarea since UI component doesn't exist
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from "@/components/ui/command";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover";
-import { router } from '@inertiajs/react';
-import { useState } from 'react';
-import { ArrowLeft, Sparkles, Loader2, Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { router } from '@inertiajs/react';
+import { ArrowLeft, Check, ChevronsUpDown, Loader2, Sparkles } from 'lucide-react';
+import { useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -46,6 +30,7 @@ interface Client {
     company_name: string;
     company_email: string;
     company_phone_number: string;
+    company_registration_number: string;
 }
 
 export default function CreateQuotation({ clients }: { clients: Client[] }) {
@@ -97,7 +82,7 @@ export default function CreateQuotation({ clients }: { clients: Client[] }) {
                 },
                 onFinish: () => {
                     setIsGenerating(false);
-                }
+                },
             });
         } catch (error) {
             console.error('Error generating quotation:', error);
@@ -105,25 +90,20 @@ export default function CreateQuotation({ clients }: { clients: Client[] }) {
         }
     };
 
-    const selectedClient = clients.find(client => client.id.toString() === form.client_id);
+    const selectedClient = clients.find((client) => client.id.toString() === form.client_id);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Create New Quotation" />
-            
+
             <div className="px-6 py-4">
-                <div className="flex items-center gap-4 mb-6">
-                    <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => router.get('/manage-quotation')}
-                        className="h-9 w-9"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
+                <div className="mb-6 flex items-center gap-4">
+                    <Button variant="outline" size="sm" onClick={() => router.get('/manage-quotation')} className="h-9 w-9">
+                        <ArrowLeft className="h-4 w-4" />
                     </Button>
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight text-foreground">Create New Quotation</h1>
-                        <p className="text-muted-foreground mt-2 text-sm">Generate an AI-powered quotation based on client requirements</p>
+                        <p className="mt-2 text-sm text-muted-foreground">Generate an AI-powered quotation based on client requirements</p>
                     </div>
                 </div>
 
@@ -134,7 +114,9 @@ export default function CreateQuotation({ clients }: { clients: Client[] }) {
                         </CardHeader>
                         <CardContent>
                             <div>
-                                <Label htmlFor="client_id" className="text-sm font-medium">Select Client *</Label>
+                                <Label htmlFor="client_id" className="text-sm font-medium">
+                                    Select Client *
+                                </Label>
                                 <Popover open={clientComboOpen} onOpenChange={setClientComboOpen}>
                                     <PopoverTrigger asChild>
                                         <Button
@@ -142,24 +124,21 @@ export default function CreateQuotation({ clients }: { clients: Client[] }) {
                                             role="combobox"
                                             aria-expanded={clientComboOpen}
                                             className={cn(
-                                                "w-full justify-between h-10 px-3 py-2 text-left font-normal",
-                                                !form.client_id && "text-muted-foreground"
+                                                'h-10 w-full justify-between px-3 py-2 text-left font-normal',
+                                                !form.client_id && 'text-muted-foreground',
                                             )}
                                         >
                                             <span className="truncate">
                                                 {form.client_id
                                                     ? clients.find((client) => client.id.toString() === form.client_id)?.company_name
-                                                    : "Choose a client..."}
+                                                    : 'Choose a client...'}
                                             </span>
                                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[400px] p-0" align="start">
                                         <Command>
-                                            <CommandInput 
-                                                placeholder="Search clients..." 
-                                                className="h-9"
-                                            />
+                                            <CommandInput placeholder="Search clients..." className="h-9" />
                                             <CommandList className="max-h-[200px]">
                                                 <CommandEmpty>No clients found.</CommandEmpty>
                                                 <CommandGroup>
@@ -168,22 +147,20 @@ export default function CreateQuotation({ clients }: { clients: Client[] }) {
                                                             key={client.id}
                                                             value={`${client.company_name} ${client.supervisor_name}`}
                                                             onSelect={() => {
-                                                                setForm({...form, client_id: client.id.toString()});
+                                                                setForm({ ...form, client_id: client.id.toString() });
                                                                 setClientComboOpen(false);
                                                             }}
-                                                            className="flex items-center gap-2 p-2 cursor-pointer"
+                                                            className="flex cursor-pointer items-center gap-2 p-2"
                                                         >
                                                             <Check
                                                                 className={cn(
-                                                                    "h-4 w-4",
-                                                                    client.id.toString() === form.client_id
-                                                                        ? "opacity-100"
-                                                                        : "opacity-0"
+                                                                    'h-4 w-4',
+                                                                    client.id.toString() === form.client_id ? 'opacity-100' : 'opacity-0',
                                                                 )}
                                                             />
-                                                            <div className="flex flex-col min-w-0 flex-1">
-                                                                <div className="font-medium text-sm truncate">{client.company_name}</div>
-                                                                <div className="text-xs text-muted-foreground truncate">{client.supervisor_name}</div>
+                                                            <div className="flex min-w-0 flex-1 flex-col">
+                                                                <div className="truncate text-sm font-medium">{client.company_name}</div>
+                                                                <div className="truncate text-xs text-muted-foreground">{client.supervisor_name}</div>
                                                             </div>
                                                         </CommandItem>
                                                     ))}
@@ -192,27 +169,31 @@ export default function CreateQuotation({ clients }: { clients: Client[] }) {
                                         </Command>
                                     </PopoverContent>
                                 </Popover>
-                                {errors.client_id && <p className="text-sm text-red-500 mt-1">{errors.client_id}</p>}
+                                {errors.client_id && <p className="mt-1 text-sm text-red-500">{errors.client_id}</p>}
                             </div>
 
                             {selectedClient && (
-                                <div className="bg-muted/50 border rounded-lg p-4">
-                                    <h4 className="font-semibold text-sm mb-3">Selected Client Details</h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                <div className="rounded-lg border bg-muted/50 p-4">
+                                    <h4 className="mb-3 text-sm font-semibold">Selected Client Details</h4>
+                                    <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
                                         <div className="flex flex-col">
-                                            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Company</span>
+                                            <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Company</span>
                                             <span className="font-medium">{selectedClient.company_name}</span>
                                         </div>
                                         <div className="flex flex-col">
-                                            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Supervisor</span>
+                                            <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Company Registration Number</span>
+                                            <span className="font-medium">{selectedClient.company_registration_number}</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Supervisor</span>
                                             <span className="font-medium">{selectedClient.supervisor_name}</span>
                                         </div>
                                         <div className="flex flex-col">
-                                            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Email</span>
+                                            <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Email</span>
                                             <span className="font-medium">{selectedClient.company_email}</span>
                                         </div>
                                         <div className="flex flex-col">
-                                            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Phone</span>
+                                            <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Phone</span>
                                             <span className="font-medium">{selectedClient.company_phone_number}</span>
                                         </div>
                                     </div>
@@ -227,12 +208,10 @@ export default function CreateQuotation({ clients }: { clients: Client[] }) {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="service_type" className="text-sm font-medium">Service Type *</Label>
-                                <Select
-                                    value={form.service_type}
-                                    onValueChange={(value) => setForm({...form, service_type: value})}
-                                    required
-                                >
+                                <Label htmlFor="service_type" className="text-sm font-medium">
+                                    Service Type *
+                                </Label>
+                                <Select value={form.service_type} onValueChange={(value) => setForm({ ...form, service_type: value })} required>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select service type" />
                                     </SelectTrigger>
@@ -244,58 +223,62 @@ export default function CreateQuotation({ clients }: { clients: Client[] }) {
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {errors.service_type && <p className="text-sm text-red-500 mt-1">{errors.service_type}</p>}
+                                {errors.service_type && <p className="mt-1 text-sm text-red-500">{errors.service_type}</p>}
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="problem" className="text-sm font-medium">Problem Description *</Label>
+                                <Label htmlFor="problem" className="text-sm font-medium">
+                                    Problem Description *
+                                </Label>
                                 <textarea
                                     id="problem"
                                     value={form.problem}
-                                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setForm({...form, problem: e.target.value})}
+                                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setForm({ ...form, problem: e.target.value })}
                                     placeholder="What specific problem needs to be solved?"
-                                    className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                                    className="flex min-h-[120px] w-full resize-none rounded-md border border-input bg-background px-3 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                     required
                                 />
-                                {errors.problem && <p className="text-sm text-red-500 mt-1">{errors.problem}</p>}
+                                {errors.problem && <p className="mt-1 text-sm text-red-500">{errors.problem}</p>}
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="solution" className="text-sm font-medium">Proposed Solution *</Label>
+                                <Label htmlFor="solution" className="text-sm font-medium">
+                                    Proposed Solution *
+                                </Label>
                                 <textarea
                                     id="solution"
                                     value={form.solution}
-                                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setForm({...form, solution: e.target.value})}
+                                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setForm({ ...form, solution: e.target.value })}
                                     placeholder="Describe your proposed solution approach..."
-                                    className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                                    className="flex min-h-[120px] w-full resize-none rounded-md border border-input bg-background px-3 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                     required
                                 />
-                                {errors.solution && <p className="text-sm text-red-500 mt-1">{errors.solution}</p>}
+                                {errors.solution && <p className="mt-1 text-sm text-red-500">{errors.solution}</p>}
                             </div>
                         </CardContent>
                     </Card>
 
                     <Card className="border shadow-sm">
                         <CardContent className="pt-6">
-                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                                 <div className="space-y-1">
-                                    <h4 className="font-bold text-lg text-foreground">Generate AI Quotation</h4>
+                                    <h4 className="text-lg font-bold text-foreground">Generate AI Quotation</h4>
                                     <p className="text-sm text-muted-foreground">Click the button below to generate your quotation</p>
                                 </div>
-                                <Button 
-                                    type="submit" 
+                                <Button
+                                    type="submit"
                                     disabled={isGenerating}
-                                    className="gap-2 min-w-[180px] h-11 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+                                    className="h-11 min-w-[180px] gap-2 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
                                     size="lg"
                                 >
                                     {isGenerating ? (
                                         <>
-                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            <Loader2 className="h-4 w-4 animate-spin" />
                                             Generating...
                                         </>
                                     ) : (
                                         <>
-                                            <Sparkles className="w-4 h-4" />
+                                            <Sparkles className="h-4 w-4" />
                                             Generate Quotation
                                         </>
                                     )}
@@ -303,12 +286,12 @@ export default function CreateQuotation({ clients }: { clients: Client[] }) {
                             </div>
 
                             {isGenerating && (
-                                <div className="mt-6 p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                                <div className="mt-6 rounded-lg border border-primary/20 bg-primary/10 p-4">
                                     <div className="flex items-center gap-2 text-primary">
-                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <Loader2 className="h-4 w-4 animate-spin" />
                                         <span className="text-sm font-medium">Generating quotation with AI...</span>
                                     </div>
-                                    <p className="text-xs text-muted-foreground mt-1">
+                                    <p className="mt-1 text-xs text-muted-foreground">
                                         Please wait while we process your request with Google Gemini API
                                     </p>
                                 </div>

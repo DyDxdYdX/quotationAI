@@ -4,7 +4,7 @@ import { Link, usePage } from '@inertiajs/react';
 
 export function NavMain({ items = [] }: { items: NavItem[] }) {
     const page = usePage();
-    
+
     const isActive = (href: string) => {
         // Special case for Manage Quotation - also match quotation routes
         if (href === '/manage-quotation') {
@@ -13,7 +13,7 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
         // Default behavior for other nav items
         return page.url.startsWith(href);
     };
-    
+
     return (
         <SidebarGroup className="px-2 py-0">
             <SidebarGroupLabel>Platform</SidebarGroupLabel>

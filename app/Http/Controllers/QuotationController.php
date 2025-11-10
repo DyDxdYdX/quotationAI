@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\GeminiController;
 use Barryvdh\DomPDF\Facade\Pdf;
 
@@ -268,10 +269,26 @@ class QuotationController extends Controller
      */
     public function generatePdf(Quotation $quotation)
     {
-        $quotation->load(['client', 'quotationRequest']);
+        $quotation->load(['client.user', 'quotationRequest']);
+        
+        // Get company information from the user who owns the client
+        $user = null;
+        if ($quotation->client && $quotation->client->user) {
+            $user = $quotation->client->user;
+        } else {
+            $user = Auth::user();
+        }
+        
+        // Get company profile with fallback defaults
+        $companyProfile = [
+            'company_name' => ($user && isset($user->company_name)) ? $user->company_name : 'Your Company Name',
+            'company_phone' => ($user && isset($user->company_phone)) ? $user->company_phone : (($user && isset($user->phone_number)) ? $user->phone_number : ''),
+            'company_email' => ($user && isset($user->company_email)) ? $user->company_email : (($user && isset($user->email)) ? $user->email : ''),
+            'company_website' => ($user && isset($user->company_website)) ? $user->company_website : '',
+        ];
         
         // Generate PDF from blade view
-        $pdf = Pdf::loadView('quotation-pdf', compact('quotation'));
+        $pdf = Pdf::loadView('quotation-pdf', compact('quotation', 'companyProfile'));
         
         // Set PDF options
         $pdf->setPaper('A4', 'portrait');

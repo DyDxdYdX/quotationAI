@@ -169,10 +169,26 @@
 <body>
     <!-- Letterhead -->
     <div class="letterhead">
-        <div class="company-name">DyDxSoft</div>
+        <div class="company-name">{{ $companyProfile['company_name'] ?? 'Your Company Name' }}</div>
         <div class="company-details">
-            Tel: +6017-776 6540 | Email: info@dydxsoft.my<br>
-            Website: www.dydxsoft.my
+            @php
+                $details = [];
+                if (!empty($companyProfile['company_phone'])) {
+                    $details[] = 'Tel: ' . $companyProfile['company_phone'];
+                }
+                if (!empty($companyProfile['company_email'])) {
+                    $details[] = 'Email: ' . $companyProfile['company_email'];
+                }
+                if (!empty($companyProfile['company_website'])) {
+                    $details[] = 'Website: ' . $companyProfile['company_website'];
+                }
+            @endphp
+            @if(count($details) > 0)
+                {{ implode(' | ', array_slice($details, 0, 2)) }}
+                @if(count($details) > 2)
+                    <br>{{ $details[2] }}
+                @endif
+            @endif
         </div>
     </div>
 
@@ -755,7 +771,7 @@
         <br><br>
         <div class="signature-line"></div>
         <p><strong>Manager</strong><br>
-        DyDxSoft</p>
+        {{ $companyProfile['company_name'] ?? 'Your Company Name' }}</p>
     </div>
 </body>
 </html>

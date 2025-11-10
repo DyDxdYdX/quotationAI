@@ -22,23 +22,32 @@ class QuotationController extends Controller
     {
         $per_page = $request->input('per_page', 10);
         $search = $request->input('search', '');
+        $userId = $request->user()->id;
         
-        $query = Quotation::with(['client', 'quotationRequest']);
+        $query = Quotation::with(['client', 'quotationRequest'])
+            ->whereHas('client', function ($clientQuery) use ($userId) {
+                $clientQuery->where('user_id', $userId);
+            });
         
         // Apply search filter
         if (!empty($search)) {
-            $query->where(function ($q) use ($search) {
+            $query->where(function ($q) use ($search, $userId) {
                 // Search by quotation ID
                 $q->where('id', 'like', '%' . $search . '%')
                     // Search by client company name
-                    ->orWhereHas('client', function ($clientQuery) use ($search) {
-                        $clientQuery->where('company_name', 'like', '%' . $search . '%')
-                            ->orWhere('supervisor_name', 'like', '%' . $search . '%')
-                            ->orWhere('company_email', 'like', '%' . $search . '%');
+                    ->orWhereHas('client', function ($clientQuery) use ($search, $userId) {
+                        $clientQuery->where('user_id', $userId)
+                            ->where(function ($cq) use ($search) {
+                                $cq->where('company_name', 'like', '%' . $search . '%')
+                                    ->orWhere('supervisor_name', 'like', '%' . $search . '%')
+                                    ->orWhere('company_email', 'like', '%' . $search . '%');
+                            });
                     })
                     // Search by service type
-                    ->orWhereHas('quotationRequest', function ($requestQuery) use ($search) {
-                        $requestQuery->where('service_type', 'like', '%' . $search . '%');
+                    ->orWhereHas('quotationRequest', function ($requestQuery) use ($search, $userId) {
+                        $requestQuery->whereHas('client', function ($clientQuery) use ($userId) {
+                            $clientQuery->where('user_id', $userId);
+                        })->where('service_type', 'like', '%' . $search . '%');
                     })
                     // Search by status
                     ->orWhere('quotation_status', 'like', '%' . $search . '%');
@@ -72,8 +81,10 @@ class QuotationController extends Controller
             ]);
         }
 
-        $clients = Client::orderBy('company_name')->get();
-        $quotationRequests = QuotationRequest::orderBy('service_type')->get();
+        $clients = Client::where('user_id', $userId)->orderBy('company_name')->get();
+        $quotationRequests = QuotationRequest::whereHas('client', function ($query) use ($userId) {
+            $query->where('user_id', $userId);
+        })->orderBy('service_type')->get();
 
         return Inertia::render('quotation/index', [
             'quotations' => $paginatedQuotations,
@@ -89,11 +100,24 @@ class QuotationController extends Controller
      */
     public function create(Request $request)
     {
-        $clients = Client::orderBy('company_name')->get();
-        $quotationRequests = QuotationRequest::orderBy('service_type')->get();
+        $userId = $request->user()->id;
+        $clients = Client::where('user_id', $userId)->orderBy('company_name')->get();
+        $quotationRequests = QuotationRequest::whereHas('client', function ($query) use ($userId) {
+            $query->where('user_id', $userId);
+        })->orderBy('service_type')->get();
         
         // Get client_id from query parameter if provided
         $clientId = $request->input('client_id');
+        
+        // Verify the client belongs to the current user if provided
+        if ($clientId) {
+            $clientExists = Client::where('id', $clientId)
+                ->where('user_id', $userId)
+                ->exists();
+            if (!$clientExists) {
+                $clientId = null;
+            }
+        }
         
         return Inertia::render('quotation/create', [
             'clients' => $clients,
@@ -107,12 +131,24 @@ class QuotationController extends Controller
      */
     public function store(Request $request)
     {
+        $userId = $request->user()->id;
+        
         $validated = $request->validate([
-            'client_id' => 'required|exists:clients,id',
+            'client_id' => ['required', 'exists:clients,id'],
             'quotation_request_id' => 'required|exists:quotation_requests,id',
             'quotation_message' => 'required|string',
             'quotation_status' => ['required', Rule::in(['pending', 'approved', 'rejected'])],
         ]);
+
+        // Verify the client belongs to the current user
+        $client = Client::where('id', $validated['client_id'])
+            ->where('user_id', $userId)
+            ->firstOrFail();
+
+        // Verify the quotation request belongs to the client
+        $quotationRequest = QuotationRequest::where('id', $validated['quotation_request_id'])
+            ->where('client_id', $client->id)
+            ->firstOrFail();
 
         Quotation::create($validated);
 
@@ -124,14 +160,21 @@ class QuotationController extends Controller
      */
     public function generate(Request $request)
     {
+        $userId = $request->user()->id;
+        
         $validated = $request->validate([
-            'client_id' => 'required|exists:clients,id',
+            'client_id' => ['required', 'exists:clients,id'],
             'service_type' => ['required', Rule::in(['web_development', 'mobile_development', 'desktop_development', 'ai_development', 'graphic_design', 'digital_marketing', 'other'])],
             'problem' => 'required|string|max:1000',
             'solution' => 'required|string|max:1000',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
         ]);
+
+        // Verify the client belongs to the current user
+        $client = Client::where('id', $validated['client_id'])
+            ->where('user_id', $userId)
+            ->firstOrFail();
 
         try {
             $geminiController = new GeminiController();
@@ -178,9 +221,15 @@ class QuotationController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Quotation $quotation)
+    public function show(Request $request, Quotation $quotation)
     {
+        $userId = $request->user()->id;
+        
+        // Load relationships and verify the quotation belongs to a client owned by the current user
         $quotation->load(['client', 'quotationRequest']);
+        if ($quotation->client->user_id !== $userId) {
+            abort(403, 'Unauthorized access to quotation.');
+        }
         
         return Inertia::render('quotation/view', [
             'quotation' => $quotation,
@@ -190,9 +239,15 @@ class QuotationController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Quotation $quotation)
+    public function edit(Request $request, Quotation $quotation)
     {
+        $userId = $request->user()->id;
+        
+        // Load relationships and verify the quotation belongs to a client owned by the current user
         $quotation->load(['client', 'quotationRequest']);
+        if ($quotation->client->user_id !== $userId) {
+            abort(403, 'Unauthorized access to quotation.');
+        }
         
         return Inertia::render('quotation/edit', [
             'quotation' => $quotation,
@@ -204,6 +259,14 @@ class QuotationController extends Controller
      */
     public function update(Request $request, Quotation $quotation)
     {
+        $userId = $request->user()->id;
+        
+        // Load client relationship and verify the quotation belongs to a client owned by the current user
+        $quotation->load('client');
+        if ($quotation->client->user_id !== $userId) {
+            abort(403, 'Unauthorized access to quotation.');
+        }
+
         // Handle different update scenarios
         if ($request->has('quotation_status') && count($request->all()) === 1) {
             // Quick status update from view page
@@ -235,7 +298,7 @@ class QuotationController extends Controller
         } else {
             // Full form update (for backward compatibility or admin use)
             $validated = $request->validate([
-                'client_id' => 'required|exists:clients,id',
+                'client_id' => ['required', 'exists:clients,id'],
                 'service_type' => ['required', Rule::in(['web_development', 'mobile_development', 'desktop_development', 'ai_development', 'graphic_design', 'digital_marketing', 'other'])],
                 'problem' => 'nullable|string|max:1000',
                 'solution' => 'nullable|string|max:1000',
@@ -244,6 +307,13 @@ class QuotationController extends Controller
                 'start_date' => 'nullable|date',
                 'end_date' => 'nullable|date|after_or_equal:start_date',
             ]);
+
+            // Verify the new client belongs to the current user if client_id is being changed
+            if ($validated['client_id'] != $quotation->client_id) {
+                $newClient = Client::where('id', $validated['client_id'])
+                    ->where('user_id', $userId)
+                    ->firstOrFail();
+            }
 
             // Update quotation
             $quotation->update([
@@ -267,8 +337,16 @@ class QuotationController extends Controller
     /**
      * Generate PDF for the quotation
      */
-    public function generatePdf(Quotation $quotation)
+    public function generatePdf(Request $request, Quotation $quotation)
     {
+        $userId = $request->user()->id;
+        
+        // Load client relationship and verify the quotation belongs to a client owned by the current user
+        $quotation->load('client');
+        if ($quotation->client->user_id !== $userId) {
+            abort(403, 'Unauthorized access to quotation.');
+        }
+        
         $quotation->load(['client.user', 'quotationRequest']);
         
         // Get company information from the user who owns the client
@@ -305,8 +383,16 @@ class QuotationController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Quotation $quotation)
+    public function destroy(Request $request, Quotation $quotation)
     {
+        $userId = $request->user()->id;
+        
+        // Load client relationship and verify the quotation belongs to a client owned by the current user
+        $quotation->load('client');
+        if ($quotation->client->user_id !== $userId) {
+            abort(403, 'Unauthorized access to quotation.');
+        }
+        
         $quotation->delete();
 
         return redirect()->route('manage-quotation')->with('success', 'Quotation deleted successfully.');

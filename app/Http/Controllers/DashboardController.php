@@ -11,15 +11,30 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        // Basic counts
-        $totalClients = Client::count();
-        $totalQuotations = Quotation::count();
-        $totalQuotationRequests = QuotationRequest::count();
-        $pendingQuotations = Quotation::where('quotation_status', 'pending')->count();
-        $approvedQuotations = Quotation::where('quotation_status', 'approved')->count();
-        $rejectedQuotations = Quotation::where('quotation_status', 'rejected')->count();
+        $userId = $request->user()->id;
+        
+        // Basic counts - filter by user_id through clients
+        $totalClients = Client::where('user_id', $userId)->count();
+        $totalQuotations = Quotation::whereHas('client', function ($query) use ($userId) {
+            $query->where('user_id', $userId);
+        })->count();
+        $totalQuotationRequests = QuotationRequest::whereHas('client', function ($query) use ($userId) {
+            $query->where('user_id', $userId);
+        })->count();
+        $pendingQuotations = Quotation::where('quotation_status', 'pending')
+            ->whereHas('client', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })->count();
+        $approvedQuotations = Quotation::where('quotation_status', 'approved')
+            ->whereHas('client', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })->count();
+        $rejectedQuotations = Quotation::where('quotation_status', 'rejected')
+            ->whereHas('client', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })->count();
 
         // Quotations by status for pie chart
         $quotationsByStatus = [
@@ -28,8 +43,11 @@ class DashboardController extends Controller
             ['name' => 'Rejected', 'value' => $rejectedQuotations, 'fill' => 'hsl(var(--chart-5))'], // Red
         ];
 
-        // Service types distribution
-        $serviceTypesData = QuotationRequest::select('service_type', DB::raw('count(*) as count'))
+        // Service types distribution - filter by user_id through clients
+        $serviceTypesData = QuotationRequest::whereHas('client', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })
+            ->select('service_type', DB::raw('count(*) as count'))
             ->groupBy('service_type')
             ->get()
             ->map(function ($item, $index) {
@@ -40,12 +58,15 @@ class DashboardController extends Controller
                 ];
             });
 
-        // Monthly quotations trend (last 6 months)
+        // Monthly quotations trend (last 6 months) - filter by user_id through clients
         $monthlyData = [];
         for ($i = 5; $i >= 0; $i--) {
             $date = now()->subMonths($i);
             $count = Quotation::whereYear('created_at', $date->year)
                 ->whereMonth('created_at', $date->month)
+                ->whereHas('client', function ($query) use ($userId) {
+                    $query->where('user_id', $userId);
+                })
                 ->count();
             
             $monthlyData[] = [
@@ -54,8 +75,11 @@ class DashboardController extends Controller
             ];
         }
 
-        // Recent quotations
-        $recentQuotations = Quotation::with(['client', 'quotationRequest'])
+        // Recent quotations - filter by user_id through clients
+        $recentQuotations = Quotation::whereHas('client', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })
+            ->with(['client', 'quotationRequest'])
             ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get();

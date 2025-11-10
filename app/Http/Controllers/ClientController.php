@@ -17,8 +17,10 @@ class ClientController extends Controller
         $perPageRequest = $request->get('per_page', 10);
         $search = $request->get('search', '');
         $perPage = $perPageRequest;
+        $userId = $request->user()->id;
         
-        $query = Client::with(['quotationRequests', 'quotations']);
+        $query = Client::with(['quotationRequests', 'quotations'])
+            ->where('user_id', $userId);
         
         // Apply search filter
         if (!empty($search)) {
@@ -88,10 +90,13 @@ class ClientController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show($id)
+    public function show(Request $request, $id)
     {
         try {
-            $client = Client::with(['quotationRequests', 'quotations'])->findOrFail($id);
+            $userId = $request->user()->id;
+            $client = Client::with(['quotationRequests', 'quotations'])
+                ->where('user_id', $userId)
+                ->findOrFail($id);
             return response()->json($client);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 404);
@@ -111,6 +116,11 @@ class ClientController extends Controller
      */
     public function update(Request $request, Client $client)
     {
+        // Verify the client belongs to the current user
+        if ($client->user_id !== $request->user()->id) {
+            return redirect()->back()->with('error', 'Unauthorized access to client.');
+        }
+
         $request->validate([
             'supervisor_name' => 'required|string|max:255',
             'company_phone_number' => 'required|string|max:255',
@@ -132,8 +142,13 @@ class ClientController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Client $client)
+    public function destroy(Request $request, Client $client)
     {
+        // Verify the client belongs to the current user
+        if ($client->user_id !== $request->user()->id) {
+            return redirect()->back()->with('error', 'Unauthorized access to client.');
+        }
+
         try {
             $client->delete();
             return redirect()->back()->with('success', 'Client deleted successfully');

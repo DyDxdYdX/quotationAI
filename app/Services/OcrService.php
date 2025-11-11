@@ -78,13 +78,16 @@ class OcrService
         ]);
 
         $tesseractResult = null;
-        $useTesseract = $this->isTesseractAvailable();
+        
+        // Check if Tesseract is disabled via config FIRST (before any Tesseract operations)
+        $tesseractDisabled = config('services.ocr.disable_tesseract', false);
+        $useTesseract = !$tesseractDisabled && $this->isTesseractAvailable();
         
         // Use the verified full path
         $filePathToProcess = $verifiedFullPath;
         
         try {
-            // Try Tesseract OCR first (if available)
+            // Try Tesseract OCR first (if available and not disabled)
             if ($useTesseract) {
                 try {
                     $tesseractResult = $this->extractWithTesseract($filePathToProcess);
@@ -188,6 +191,11 @@ class OcrService
     private function extractWithTesseract(string $filePath): array
     {
         try {
+            // Double-check that Tesseract is not disabled (safety check)
+            if (config('services.ocr.disable_tesseract', false)) {
+                throw new \Exception('Tesseract OCR is disabled via configuration');
+            }
+
             // Check if file is PDF, convert to image first if needed
             $imagePath = $this->convertPdfToImage($filePath);
             
@@ -205,6 +213,13 @@ class OcrService
             return [
                 'text' => $text,
                 'confidence' => $confidence
+            ];
+        } catch (\Error $e) {
+            // Catch Error (like undefined function system()) separately from Exception
+            Log::warning('Tesseract OCR failed (Error): ' . $e->getMessage());
+            return [
+                'text' => '',
+                'confidence' => 0.0
             ];
         } catch (\Exception $e) {
             Log::warning('Tesseract OCR failed: ' . $e->getMessage());
@@ -495,13 +510,15 @@ class OcrService
     private function isTesseractAvailable(): bool
     {
         // Check if Tesseract is disabled via config (for shared hosting)
+        // This check is redundant here since we check it before calling this method,
+        // but keeping it as a safety check
         if (config('services.ocr.disable_tesseract', false)) {
             Log::info('Tesseract OCR is disabled via configuration');
             return false;
         }
 
         // Check if class exists (package might not be installed)
-        if (!class_exists(TesseractOCR::class)) {
+        if (!class_exists('thiagoalessio\TesseractOCR\TesseractOCR')) {
             Log::info('TesseractOCR class not found - package may not be installed');
             return false;
         }
@@ -509,9 +526,14 @@ class OcrService
         try {
             // Try to create a TesseractOCR instance
             // This will fail if Tesseract binary is not available on the system
+            // or if system() function is disabled (shared hosting)
             $testOcr = new TesseractOCR();
             // The actual check happens when we try to run OCR, but this validates the class can be instantiated
             return true;
+        } catch (\Error $e) {
+            // Catch Error (like undefined function) separately from Exception
+            Log::warning('Tesseract OCR not available (Error): ' . $e->getMessage());
+            return false;
         } catch (\Exception $e) {
             Log::info('Tesseract OCR not available: ' . $e->getMessage());
             return false;

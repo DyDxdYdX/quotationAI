@@ -39,4 +39,15 @@ return [
         'api_key' => env('GEMINI_API_KEY'),
     ],
 
+    'google_vision' => [
+        'credentials' => env('GOOGLE_APPLICATION_CREDENTIALS'),
+        'project_id' => env('GOOGLE_CLOUD_PROJECT_ID'),
+        'key_file' => env('GOOGLE_VISION_KEY_FILE'),
+    ],
+
+    'ocr' => [
+        'disable_tesseract' => env('OCR_DISABLE_TESSERACT', false), // Set to true for shared hosting
+        'prefer_google_vision' => env('OCR_PREFER_GOOGLE_VISION', false), // Set to true to skip Tesseract
+    ],
+
 ];

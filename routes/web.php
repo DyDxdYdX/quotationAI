@@ -21,6 +21,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('client', [ClientController::class, 'index'])->name('client');
     Route::post('client', [ClientController::class, 'store'])->name('client.store');
+    Route::post('client/process-ocr', [ClientController::class, 'processOcr'])->name('client.process-ocr');
     Route::put('client/{client}', [ClientController::class, 'update'])->name('client.update');
     Route::delete('client/{client}', [ClientController::class, 'destroy'])->name('client.destroy');
 });

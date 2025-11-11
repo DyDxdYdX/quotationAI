@@ -15,11 +15,19 @@ import {
 } from '@/components/ui/pagination';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { FileUpload } from '@/components/ui/file-upload';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { AlertTriangle, EyeIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+
+// Declare route helper type (from Ziggy)
+declare global {
+    interface Window {
+        route: (name: string, params?: Record<string, unknown>, absolute?: boolean) => string;
+    }
+}
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -101,6 +109,8 @@ export default function Client({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [search, setSearch] = useState(search_request);
     const [searchInput, setSearchInput] = useState(search_request);
+    const [isProcessingOcr, setIsProcessingOcr] = useState(false);
+    const [ocrError, setOcrError] = useState<string | null>(null);
 
     // Update search input when search_request prop changes
     useEffect(() => {
@@ -161,7 +171,104 @@ export default function Client({
             company_city: '',
             company_registration_number: '',
         });
+        setOcrError(null);
+        setIsProcessingOcr(false);
         setCreateDialogOpen(true);
+    };
+
+    const handleFileUpload = async (file: File) => {
+        setIsProcessingOcr(true);
+        setOcrError(null);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Get CSRF token from meta tag
+            const csrfMetaTag = document.querySelector('meta[name="csrf-token"]');
+            const csrfToken = csrfMetaTag?.getAttribute('content') || '';
+            
+            if (!csrfToken) {
+                setOcrError('CSRF token not found. Please refresh the page and try again.');
+                setIsProcessingOcr(false);
+                return;
+            }
+            
+            // Include token in FormData (Laravel checks both header and form data)
+            formData.append('_token', csrfToken);
+
+            // Use route helper if available, otherwise use direct URL
+            const url = typeof window.route === 'function' 
+                ? window.route('client.process-ocr')
+                : '/client/process-ocr';
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken,
+                    // Don't set Content-Type - browser will set it automatically with boundary for FormData
+                },
+                credentials: 'same-origin', // Include cookies (important for CSRF token and session)
+                body: formData,
+            });
+
+            // Check if response is ok before parsing JSON
+            if (!response.ok) {
+                // Try to parse error response
+                let errorMessage = 'Failed to process document';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorData.message || errorMessage;
+                    
+                    // Handle 419 CSRF token mismatch specifically
+                    if (response.status === 419) {
+                        errorMessage = 'Session expired. Please refresh the page and try again.';
+                        // Optionally reload the page to get a fresh CSRF token
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 2000);
+                    }
+                } catch {
+                    // If response is not JSON, use status text
+                    if (response.status === 419) {
+                        errorMessage = 'Session expired. Please refresh the page and try again.';
+                    } else {
+                        errorMessage = response.statusText || `Server error (${response.status})`;
+                    }
+                }
+                setOcrError(errorMessage);
+                return;
+            }
+
+            const data = await response.json();
+
+            if (data.success && data.data) {
+                const extractedData = data.data;
+                
+                // Auto-populate form fields with extracted data
+                // Only populate fields that are not empty
+                setCreateForm(prev => ({
+                    company_name: extractedData.company_name || prev.company_name,
+                    company_registration_number: extractedData.company_registration_number || prev.company_registration_number,
+                    supervisor_name: extractedData.supervisor_name || prev.supervisor_name,
+                    company_email: extractedData.company_email || prev.company_email,
+                    company_phone_number: extractedData.company_phone_number || prev.company_phone_number,
+                    company_address: extractedData.company_address || prev.company_address,
+                    company_city: extractedData.company_city || prev.company_city,
+                }));
+            } else {
+                setOcrError(data.error || 'Failed to extract data from document. Please try again or enter data manually.');
+            }
+        } catch (error) {
+            console.error('OCR processing error:', error);
+            const errorMessage = error instanceof Error 
+                ? error.message 
+                : 'Failed to process document. Please check if the document is clear and try again, or enter data manually.';
+            setOcrError(errorMessage);
+        } finally {
+            setIsProcessingOcr(false);
+        }
     };
 
     const handleEdit = (client: Client) => {
@@ -601,6 +708,31 @@ export default function Client({
                         <DialogTitle className="text-2xl font-bold">Add New Client</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={submitCreate} className="space-y-4">
+                        {/* OCR File Upload Section */}
+                        <div className="space-y-2">
+                            <Label>Upload Document (Invoice, Quotation, etc.)</Label>
+                            <FileUpload
+                                onFileSelect={handleFileUpload}
+                                acceptedTypes="image/jpeg,image/jpg,image/png,image/webp,.pdf"
+                                maxSize={10}
+                                isProcessing={isProcessingOcr}
+                                disabled={isProcessingOcr || isSubmitting}
+                            />
+                            {ocrError && (
+                                <Alert variant="destructive" className="mt-2">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    <AlertDescription className="text-sm">{ocrError}</AlertDescription>
+                                </Alert>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                                Upload a document to automatically extract customer information. Missing fields can be filled manually.
+                            </p>
+                        </div>
+
+                        <div className="border-t pt-4">
+                            <h3 className="text-lg font-semibold mb-4">Client Information</h3>
+                        </div>
+
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <Label htmlFor="create_company_name">Company Name *</Label>

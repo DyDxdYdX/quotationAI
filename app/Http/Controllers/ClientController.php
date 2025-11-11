@@ -3,8 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
+use App\Services\OcrService;
+use App\Services\CustomerDataExtractor;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Log;
 
 class ClientController extends Controller
 {
@@ -154,6 +158,62 @@ class ClientController extends Controller
             return redirect()->back()->with('success', 'Client deleted successfully');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to delete client: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Process uploaded document with OCR and extract customer data
+     */
+    public function processOcr(Request $request)
+    {
+        try {
+            $request->validate([
+                'file' => 'required|file|mimes:jpeg,jpg,png,pdf,webp|max:10240', // 10MB max
+            ]);
+
+            $file = $request->file('file');
+
+            // Process OCR
+            $ocrService = new OcrService();
+            $ocrResult = $ocrService->extractText($file);
+
+            // Extract customer data from OCR text
+            $extractor = new CustomerDataExtractor();
+            $customerData = $extractor->extract($ocrResult['text']);
+
+            // Log OCR results for fine-tuning
+            Log::info('OCR Processing Results', [
+                'method' => $ocrResult['method'],
+                'confidence' => $ocrResult['confidence'],
+                'text_length' => strlen($ocrResult['text']),
+                'extracted_data' => $customerData,
+                'text_preview' => Str::limit($ocrResult['text'], 500),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data' => $customerData,
+                'ocr' => [
+                    'method' => $ocrResult['method'],
+                    'confidence' => $ocrResult['confidence'],
+                    'text_preview' => Str::limit($ocrResult['text'], 200),
+                    'text_full' => $ocrResult['text'], // Full text for fine-tuning
+                    'text_length' => strlen($ocrResult['text']),
+                ],
+            ]);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation failed',
+                'messages' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('OCR processing failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to process document: ' . $e->getMessage(),
+            ], 500);
         }
     }
 }

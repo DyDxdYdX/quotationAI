@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Services\OcrService;
-use App\Services\CustomerDataExtractor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -177,11 +176,11 @@ class ClientController extends Controller
             $ocrService = new OcrService();
             $ocrResult = $ocrService->extractText($file);
 
-            // Extract customer data from OCR text
-            $extractor = new CustomerDataExtractor();
-            $customerData = $extractor->extract($ocrResult['text']);
+            // Extract customer data from OCR text using Gemini AI
+            $geminiController = new GeminiController();
+            $customerData = $geminiController->extractCustomerDataFromOcr($ocrResult['text']);
 
-            // Log OCR results for fine-tuning
+            // Log OCR results
             Log::info('OCR Processing Results', [
                 'method' => $ocrResult['method'],
                 'confidence' => $ocrResult['confidence'],
@@ -197,7 +196,6 @@ class ClientController extends Controller
                     'method' => $ocrResult['method'],
                     'confidence' => $ocrResult['confidence'],
                     'text_preview' => Str::limit($ocrResult['text'], 200),
-                    'text_full' => $ocrResult['text'], // Full text for fine-tuning
                     'text_length' => strlen($ocrResult['text']),
                 ],
             ]);

@@ -316,4 +316,159 @@ CRITICAL REQUIREMENTS:
             throw new Exception('Failed to generate quotation: ' . $e->getMessage());
         }
     }
+
+    /**
+     * Extract customer data from OCR text using Gemini AI
+     * 
+     * @param string $ocrText
+     * @return array
+     */
+    public function extractCustomerDataFromOcr(string $ocrText): array
+    {
+        try {
+            // Check if API key is configured
+            $apiKey = config('services.gemini.api_key');
+            if (!$apiKey) {
+                throw new Exception('Gemini API key not configured');
+            }
+
+            // Initialize Gemini client
+            $client = new Client($apiKey);
+
+            // Create prompt for customer data extraction
+            $prompt = $this->createCustomerDataExtractionPrompt($ocrText);
+
+            $systemInstruction = "You are a data extraction assistant. Your role is to extract customer/company information from OCR text extracted from documents like invoices, quotations, or business documents.
+
+CRITICAL REQUIREMENTS:
+- You MUST respond with ONLY valid JSON (no markdown, no explanations, no code blocks)
+- Extract only the data that is clearly present in the text
+- If a field is not found or unclear, return an empty string for that field
+- Be accurate and only extract what you can clearly identify
+- Return the JSON in the exact structure specified
+- Do not make up or guess data that is not present";
+
+            $response = $client->withV1BetaVersion()
+                ->generativeModel(ModelName::GEMINI_2_5_FLASH)
+                ->withSystemInstruction($systemInstruction)
+                ->generateContent(
+                    new TextPart($prompt),
+                );
+
+            // Get the generated text from the response
+            $generatedText = $response->text();
+            
+            // Clean the response - remove markdown code blocks if present
+            $cleanedText = $generatedText;
+            
+            // Remove markdown code blocks (```json ... ```)
+            $cleanedText = preg_replace('/```json\s*/i', '', $cleanedText);
+            $cleanedText = preg_replace('/```\s*$/i', '', $cleanedText);
+            $cleanedText = trim($cleanedText);
+            
+            // Try to extract JSON from the response
+            try {
+                // Try to parse as JSON
+                $jsonData = json_decode($cleanedText, true);
+                
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    throw new Exception('JSON parse error: ' . json_last_error_msg());
+                }
+                
+                // Validate and normalize the structure
+                $customerData = [
+                    'company_name' => $jsonData['company_name'] ?? '',
+                    'company_registration_number' => $jsonData['company_registration_number'] ?? '',
+                    'supervisor_name' => $jsonData['supervisor_name'] ?? '',
+                    'company_email' => $jsonData['company_email'] ?? '',
+                    'company_phone_number' => $jsonData['company_phone_number'] ?? '',
+                    'company_address' => $jsonData['company_address'] ?? '',
+                    'company_city' => $jsonData['company_city'] ?? '',
+                ];
+
+                // Clean up the data (trim whitespace, normalize)
+                foreach ($customerData as $key => $value) {
+                    $customerData[$key] = trim($value ?? '');
+                }
+
+                return $customerData;
+                
+            } catch (Exception $e) {
+                $parseError = $e->getMessage();
+                Log::error('Failed to parse Gemini customer data response: ' . $parseError . ' | Raw response: ' . substr($cleanedText, 0, 500));
+                
+                // Return empty data structure on parse error
+                return [
+                    'company_name' => '',
+                    'company_registration_number' => '',
+                    'supervisor_name' => '',
+                    'company_email' => '',
+                    'company_phone_number' => '',
+                    'company_address' => '',
+                    'company_city' => '',
+                ];
+            }
+        } catch (Exception $e) {
+            Log::error('Gemini API Error during customer data extraction: ' . $e->getMessage());
+            
+            // Return empty data structure on error
+            return [
+                'company_name' => '',
+                'company_registration_number' => '',
+                'supervisor_name' => '',
+                'company_email' => '',
+                'company_phone_number' => '',
+                'company_address' => '',
+                'company_city' => '',
+            ];
+        }
+    }
+
+    /**
+     * Create prompt for customer data extraction from OCR text
+     * 
+     * @param string $ocrText
+     * @return string
+     */
+    private function createCustomerDataExtractionPrompt(string $ocrText): string
+    {
+        return "Extract customer/company information from the following OCR text extracted from a document (invoice, quotation, or business document).
+
+OCR TEXT:
+{$ocrText}
+
+INSTRUCTIONS:
+1. Extract the following fields from the text above
+2. If a field is not found or cannot be clearly identified, return an empty string for that field
+3. Do not guess or make up data
+4. Return the data as a JSON object with the following structure
+
+REQUIRED JSON STRUCTURE:
+{
+  \"company_name\": \"[Company or business name]\",
+  \"company_registration_number\": \"[Registration number, UEN, ACN, or similar]\",
+  \"supervisor_name\": \"[Contact person, supervisor, manager, or attention name]\",
+  \"company_email\": \"[Email address]\",
+  \"company_phone_number\": \"[Phone number in international format if available]\",
+  \"company_address\": \"[Street address, building, or location]\",
+  \"company_city\": \"[City name]\"
+}
+
+FIELD EXTRACTION GUIDELINES:
+- **company_name**: Look for business/company names, trading names, or registered names. May include suffixes like Sdn Bhd, Ltd, Inc, Corp, etc.
+- **company_registration_number**: Look for registration numbers, company registration numbers, UEN (Singapore), ACN (Australia), CRN, or similar identification numbers
+- **supervisor_name**: Look for contact person, supervisor, manager, attention (Attn), or person name fields
+- **company_email**: Extract email addresses (format: name@domain.com)
+- **company_phone_number**: Extract phone numbers. Remove spaces, dashes, and parentheses. Include country code if present (e.g., +60 for Malaysia)
+- **company_address**: Extract street address, building name, street name, and street number. Do not include city or country in this field
+- **company_city**: Extract city name only (e.g., Kuala Lumpur, Kota Kinabalu, Singapore, etc.). Do not include state, province, or country
+
+IMPORTANT:
+- Return ONLY the JSON object, no markdown formatting, no code blocks, no explanations
+- All fields should be strings
+- If a field is not found, use an empty string \"\"
+- Be precise and only extract data that is clearly present in the text
+- For phone numbers, normalize to include country code if present, remove formatting characters
+- For addresses, extract only the street address part, not the city or country";
+    }
 }

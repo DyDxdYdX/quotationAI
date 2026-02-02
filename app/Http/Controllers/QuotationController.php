@@ -392,7 +392,7 @@ class QuotationController extends Controller
         $pdf->setOption('enable-local-file-access', true);
         
         // Generate filename
-        $quotationNumber = 'QTN-' . str_pad($quotation->id, 6, '0', STR_PAD_LEFT);
+        $quotationNumber = 'QTN-' . $quotation->quotation_number;
         $filename = "Quotation_{$quotationNumber}.pdf";
         
         // Return PDF as download

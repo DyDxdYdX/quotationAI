@@ -3,7 +3,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, usePage } from '@inertiajs/react';
-import { AlertCircle, Calendar, CheckCircle, Clock, FileText, TrendingUp, Users, XCircle } from 'lucide-react';
+import { AlertCircle, Calendar, CheckCircle, Clock, FileText, TrendingUp, Users, XCircle, Receipt, DollarSign, Wallet } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, Legend, Pie, PieChart, XAxis, YAxis, type LegendPayload } from 'recharts';
 
@@ -32,9 +32,14 @@ interface DashboardPageProps extends SharedData {
         pendingQuotations: number;
         approvedQuotations: number;
         rejectedQuotations: number;
+        totalInvoices: number;
+        pendingInvoices: number;
+        paidInvoices: number;
+        voidInvoices: number;
     };
     chartData: {
         quotationsByStatus: Array<{ name: string; value: number; fill: string }>;
+        invoicesByStatus: Array<{ name: string; value: number; fill: string }>;
         serviceTypesData: Array<{ name: string; value: number; fill: string }>;
         monthlyData: Array<{ month: string; quotations: number }>;
     };
@@ -180,6 +185,7 @@ export default function Dashboard() {
     };
 
     const quotationsByStatusData = transformChartData(chartData.quotationsByStatus);
+    const invoicesByStatusData = transformChartData(chartData.invoicesByStatus);
     const serviceTypesData = transformChartData(chartData.serviceTypesData);
 
     // Get computed CSS variable value helper
@@ -196,6 +202,7 @@ export default function Dashboard() {
     const borderColor = getCSSVar('border', '#e2e8f0');
 
     const quotationsTotal = getTotalValue(chartData.quotationsByStatus);
+    const invoicesTotal = getTotalValue(chartData.invoicesByStatus);
     const serviceTypesTotal = getTotalValue(chartData.serviceTypesData);
 
     // Custom label function for pie charts - show value and percentage
@@ -330,6 +337,66 @@ export default function Dashboard() {
                     </Card>
                 </div>
 
+                {/* Invoice Analytics Cards */}
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                    <Card className="overflow-hidden border-0 shadow-md transition-shadow duration-300 hover:shadow-lg">
+                        <div className="h-1.5 bg-gradient-to-r from-blue-500 to-blue-600" />
+                        <CardContent className="p-6">
+                            <div className="flex items-center gap-4">
+                                <div className="rounded-lg bg-blue-500/10 p-3">
+                                    <Receipt className="h-6 w-6 text-blue-600" />
+                                </div>
+                                <div>
+                                    <p className="text-3xl font-bold text-foreground">{analytics.totalInvoices}</p>
+                                    <p className="text-sm tracking-wide text-muted-foreground uppercase">Total Invoices</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card className="overflow-hidden border-0 shadow-md transition-shadow duration-300 hover:shadow-lg">
+                        <div className="h-1.5 bg-gradient-to-r from-amber-500 to-amber-600" />
+                        <CardContent className="p-6">
+                            <div className="flex items-center gap-4">
+                                <div className="rounded-lg bg-amber-500/10 p-3">
+                                    <AlertCircle className="h-6 w-6 text-amber-600" />
+                                </div>
+                                <div>
+                                    <p className="text-3xl font-bold text-foreground">{analytics.pendingInvoices}</p>
+                                    <p className="text-sm tracking-wide text-muted-foreground uppercase">Pending Invoices</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card className="overflow-hidden border-0 shadow-md transition-shadow duration-300 hover:shadow-lg">
+                        <div className="h-1.5 bg-gradient-to-r from-emerald-500 to-emerald-600" />
+                        <CardContent className="p-6">
+                            <div className="flex items-center gap-4">
+                                <div className="rounded-lg bg-emerald-500/10 p-3">
+                                    <CheckCircle className="h-6 w-6 text-emerald-600" />
+                                </div>
+                                <div>
+                                    <p className="text-3xl font-bold text-foreground">{analytics.paidInvoices}</p>
+                                    <p className="text-sm tracking-wide text-muted-foreground uppercase">Paid Invoices</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card className="overflow-hidden border-0 shadow-md transition-shadow duration-300 hover:shadow-lg">
+                        <div className="h-1.5 bg-gradient-to-r from-rose-500 to-rose-600" />
+                        <CardContent className="p-6">
+                            <div className="flex items-center gap-4">
+                                <div className="rounded-lg bg-rose-500/10 p-3">
+                                    <XCircle className="h-6 w-6 text-rose-600" />
+                                </div>
+                                <div>
+                                    <p className="text-3xl font-bold text-foreground">{analytics.voidInvoices}</p>
+                                    <p className="text-sm tracking-wide text-muted-foreground uppercase">Void Invoices</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
                 {/* Charts Section */}
                 <div className="grid gap-6 md:grid-cols-2">
                     {/* Quotations by Status - Pie Chart */}
@@ -365,6 +432,52 @@ export default function Dashboard() {
                                             const numericValue = typeof payloadValue === 'number' ? payloadValue : 0;
                                             const percentage =
                                                 quotationsTotal > 0 && numericValue > 0 ? ((numericValue / quotationsTotal) * 100).toFixed(1) : '0';
+                                            return (
+                                                <span style={{ color: 'hsl(var(--foreground))', fontSize: '13px', fontWeight: '500' }}>
+                                                    <span style={{ color: entry.color, marginRight: '8px' }}>●</span>
+                                                    {value}: <strong>{numericValue}</strong> ({percentage}%)
+                                                </span>
+                                            );
+                                        }}
+                                    />
+                                </PieChart>
+                            </ChartContainer>
+                        </CardContent>
+                    </Card>
+
+                    {/* Invoices by Status - Pie Chart */}
+                    <Card className="border shadow-sm">
+                        <CardHeader className="border-b bg-muted/30">
+                            <CardTitle className="text-xl font-bold">Invoices by Status</CardTitle>
+                            <CardDescription className="text-sm text-muted-foreground">Distribution of invoice statuses</CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                            <ChartContainer config={chartConfig} className="h-[300px]">
+                                <PieChart>
+                                    <ChartTooltip content={<ChartTooltipContent />} />
+                                    <Pie
+                                        data={invoicesByStatusData}
+                                        dataKey="value"
+                                        nameKey="name"
+                                        cx="50%"
+                                        cy="40%"
+                                        outerRadius={65}
+                                        label={createPieLabelFunction(invoicesTotal)}
+                                        labelLine={{ strokeWidth: 2 }}
+                                    >
+                                        {invoicesByStatusData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                                        ))}
+                                    </Pie>
+                                    <Legend
+                                        verticalAlign="bottom"
+                                        height={60}
+                                        wrapperStyle={{ paddingTop: '20px' }}
+                                        formatter={(value, entry: LegendPayload) => {
+                                            const payloadValue = entry.payload?.value;
+                                            const numericValue = typeof payloadValue === 'number' ? payloadValue : 0;
+                                            const percentage =
+                                                invoicesTotal > 0 && numericValue > 0 ? ((numericValue / invoicesTotal) * 100).toFixed(1) : '0';
                                             return (
                                                 <span style={{ color: 'hsl(var(--foreground))', fontSize: '13px', fontWeight: '500' }}>
                                                     <span style={{ color: entry.color, marginRight: '8px' }}>●</span>

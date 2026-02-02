@@ -19,6 +19,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('quotation/{quotation}/pdf', [App\Http\Controllers\QuotationController::class, 'generatePdf'])->name('quotation.pdf');
     Route::resource('quotation', App\Http\Controllers\QuotationController::class);
 
+    // Invoice Routes
+    Route::post('quotation/{quotation}/convert', [App\Http\Controllers\InvoiceController::class, 'convert'])->name('quotation.convert');
+    Route::get('manage-invoices', [App\Http\Controllers\InvoiceController::class, 'index'])->name('manage-invoices');
+    Route::get('invoices/{invoice}/pdf', [App\Http\Controllers\InvoiceController::class, 'generatePdf'])->name('invoices.pdf');
+    Route::resource('invoices', App\Http\Controllers\InvoiceController::class);
+
     Route::get('client', [ClientController::class, 'index'])->name('client');
     Route::post('client', [ClientController::class, 'store'])->name('client.store');
     Route::post('client/process-ocr', [ClientController::class, 'processOcr'])->name('client.process-ocr');

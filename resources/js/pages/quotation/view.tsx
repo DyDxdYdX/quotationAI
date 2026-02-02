@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { ArrowLeft, CheckCircle, Clock, Loader2, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clock, FileText, Loader2, XCircle } from 'lucide-react';
 import { useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -43,6 +43,7 @@ interface Quotation {
     quotation_request_id: number;
     quotation_message: string | object;
     quotation_status: 'pending' | 'approved' | 'rejected';
+    quotation_number: string;
     start_date?: string | null;
     end_date?: string | null;
     created_at: string;
@@ -97,7 +98,7 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`View Quotation QTN-${quotation.id.toString().padStart(6, '0')} - ${quotation.client?.company_name}`} />
+            <Head title={`View Quotation QTN-${quotation.quotation_number} - ${quotation.client?.company_name}`} />
 
             <div className="px-6 py-4">
                 <div className="mb-6 flex items-center gap-4">
@@ -107,7 +108,7 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
                     <div className="flex-1">
                         <div className="flex items-center gap-4">
                             <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                                Quotation QTN-{quotation.id.toString().padStart(6, '0')}
+                                Quotation QTN-{quotation.quotation_number}
                             </h1>
                             <Badge className={`${getStatusColor(quotation.quotation_status)} border px-3 py-1 text-xs font-semibold`}>
                                 {quotation.quotation_status.charAt(0).toUpperCase() + quotation.quotation_status.slice(1)}
@@ -301,6 +302,16 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
                                     <p className="text-sm text-muted-foreground">Manage quotation status and download PDF</p>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
+                                    {quotation.quotation_status === 'approved' && (
+                                        <Button
+                                            onClick={() => router.post(`/quotation/${quotation.id}/convert`)}
+                                            className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                                        >
+                                            <FileText className="h-4 w-4" />
+                                            Convert to Invoice
+                                        </Button>
+                                    )}
+
                                     <Button
                                         onClick={async () => {
                                             if (quotation.quotation_status === 'approved') {
@@ -314,7 +325,7 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
                                                     const url = window.URL.createObjectURL(blob);
                                                     const link = document.createElement('a');
                                                     link.href = url;
-                                                    link.download = `Quotation_QTN-${quotation.id.toString().padStart(6, '0')}.pdf`;
+                                                    link.download = `Quotation_QTN-${quotation.quotation_number}.pdf`;
                                                     document.body.appendChild(link);
                                                     link.click();
                                                     document.body.removeChild(link);

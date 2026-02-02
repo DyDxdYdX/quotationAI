@@ -10,6 +10,9 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
         if (href === '/manage-quotation') {
             return page.url.startsWith('/manage-quotation') || page.url.startsWith('/quotation');
         }
+        if (href === '/manage-invoices') {
+            return page.url.startsWith('/manage-invoices') || page.url.startsWith('/invoices');
+        }
         // Default behavior for other nav items
         return page.url.startsWith(href);
     };

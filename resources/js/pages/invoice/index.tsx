@@ -1,11 +1,10 @@
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
     Pagination,
     PaginationContent,
@@ -20,24 +19,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { AlertTriangle, CheckCircle, EyeIcon, FileDown, FileText, MoreVertical, PencilIcon, PlusIcon, SearchIcon, TrashIcon, X, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, EyeIcon, FileDown, MoreVertical, PlusIcon, SearchIcon, TrashIcon, X, XCircle, PencilIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Manage Quotation',
-        href: '/manage-quotation',
+        title: 'Manage Invoices',
+        href: '/manage-invoices',
     },
 ];
-
-const serviceTypeLabels = {
-    web_development: 'Web Development',
-    mobile_development: 'Mobile Development',
-    desktop_development: 'Desktop Development',
-    ai_development: 'AI Development',
-    graphic_design: 'Graphic Design',
-    digital_marketing: 'Digital Marketing',
-};
 
 interface Client {
     id: number;
@@ -45,32 +35,30 @@ interface Client {
     company_name: string;
     company_email: string;
     company_phone_number: string;
-    company_registration_number: string;
 }
 
-interface QuotationRequest {
-    id: number;
-    service_type: string;
-    message: string;
-}
-
-interface Quotation {
+interface Invoice {
     id: number;
     client_id: number;
-    quotation_request_id: number;
-    quotation_message: string | object;
-    quotation_status: 'pending' | 'approved' | 'rejected';
-    quotation_number: string;
-    start_date?: string | null;
-    end_date?: string | null;
+    quotation_id: number | null;
+    invoice_number: string;
+    invoice_date: string;
+    due_date: string;
+    status: 'pending' | 'paid' | 'void';
+    currency: string;
+    total_amount: number | string;
+    notes: string | null;
     created_at: string;
     updated_at: string;
     client?: Client;
-    quotation_request?: QuotationRequest;
+    quotation?: {
+        id: number;
+        quotation_number: string;
+    };
 }
 
-interface PaginatedQuotations {
-    data: Quotation[];
+interface PaginatedInvoices {
+    data: Invoice[];
     current_page: number;
     last_page: number;
     per_page: number;
@@ -84,28 +72,17 @@ interface PaginatedQuotations {
     }>;
 }
 
-export default function Quotation({
-    quotations,
+export default function InvoiceIndex({
+    invoices,
     per_page_request = '10',
     search_request = '',
-    clients = [],
-    quotation_requests = [],
 }: {
-    quotations?: PaginatedQuotations;
+    invoices?: PaginatedInvoices;
     per_page_request?: string;
     search_request?: string;
-    clients?: Client[];
-    quotation_requests?: QuotationRequest[];
 }) {
-    const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null);
-    const [createForm, setCreateForm] = useState({
-        client_id: '',
-        quotation_request_id: '',
-        quotation_message: '',
-        quotation_status: 'pending' as 'pending' | 'approved' | 'rejected',
-    });
+    const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [search, setSearch] = useState(search_request);
     const [searchInput, setSearchInput] = useState(search_request);
@@ -120,7 +97,7 @@ export default function Quotation({
         e.preventDefault();
         setSearch(searchInput);
         router.get(
-            window.location.pathname,
+            '/manage-invoices',
             {
                 search: searchInput,
                 per_page: per_page_request,
@@ -134,7 +111,7 @@ export default function Quotation({
         setSearchInput('');
         setSearch('');
         router.get(
-            window.location.pathname,
+            '/manage-invoices',
             {
                 per_page: per_page_request,
                 page: 1,
@@ -143,58 +120,38 @@ export default function Quotation({
         );
     };
 
-    const quotationSummary = [
+    const invoiceSummary = [
         {
-            title: 'Total Quotations',
-            value: quotations?.total || 0,
+            title: 'Total Invoices',
+            value: invoices?.total || 0,
         },
         {
-            title: 'Pending Quotations',
-            value: quotations?.data?.filter((q) => q.quotation_status === 'pending').length || 0,
+            title: 'Pending',
+            value: invoices?.data?.filter((i) => i.status === 'pending').length || 0,
         },
         {
-            title: 'Approved Quotations',
-            value: quotations?.data?.filter((q) => q.quotation_status === 'approved').length || 0,
+            title: 'Paid',
+            value: invoices?.data?.filter((i) => i.status === 'paid').length || 0,
         },
         {
-            title: 'Rejected Quotations',
-            value: quotations?.data?.filter((q) => q.quotation_status === 'rejected').length || 0,
+            title: 'Void',
+            value: invoices?.data?.filter((i) => i.status === 'void').length || 0,
         },
     ];
 
-    const handleDelete = (quotation: Quotation) => {
-        setSelectedQuotation(quotation);
+    const handleDelete = (invoice: Invoice) => {
+        setSelectedInvoice(invoice);
         setDeleteDialogOpen(true);
     };
 
-    const submitCreate = (e: React.FormEvent) => {
-        e.preventDefault();
-
-        setIsSubmitting(true);
-        router.post('/quotation', createForm, {
-            onSuccess: () => {
-                setCreateDialogOpen(false);
-                setCreateForm({
-                    client_id: '',
-                    quotation_request_id: '',
-                    quotation_message: '',
-                    quotation_status: 'pending',
-                });
-            },
-            onFinish: () => {
-                setIsSubmitting(false);
-            },
-        });
-    };
-
     const confirmDelete = () => {
-        if (!selectedQuotation) return;
+        if (!selectedInvoice) return;
 
         setIsSubmitting(true);
-        router.delete(`/quotation/${selectedQuotation.id}`, {
+        router.delete(`/invoices/${selectedInvoice.id}`, {
             onSuccess: () => {
                 setDeleteDialogOpen(false);
-                setSelectedQuotation(null);
+                setSelectedInvoice(null);
             },
             onFinish: () => {
                 setIsSubmitting(false);
@@ -202,12 +159,12 @@ export default function Quotation({
         });
     };
 
-    const handleStatusUpdate = (quotation: Quotation, status: 'approved' | 'rejected') => {
+    const handleStatusUpdate = (invoice: Invoice, status: 'paid' | 'void' | 'pending') => {
         setIsSubmitting(true);
         router.put(
-            `/quotation/${quotation.id}`,
+            `/invoices/${invoice.id}`,
             {
-                quotation_status: status,
+                status: status,
             },
             {
                 onSuccess: () => {
@@ -220,29 +177,25 @@ export default function Quotation({
         );
     };
 
-    const handleDownloadPdf = async (quotation: Quotation) => {
-        // Only allow download if status is approved
-        if (quotation.quotation_status === 'approved') {
-            try {
-                const response = await fetch(`/quotation/${quotation.id}/pdf`, {
-                    credentials: 'include', // Include cookies for authentication
-                });
-                if (!response.ok) throw new Error('Failed to generate PDF');
-                
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `Quotation_QTN-${quotation.id.toString().padStart(6, '0')}.pdf`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
-            } catch (error) {
-                console.error('Error downloading PDF:', error);
-                // Fallback to direct navigation
-                window.location.href = `/quotation/${quotation.id}/pdf`;
-            }
+    const handleDownloadPdf = async (invoice: Invoice) => {
+        try {
+            const response = await fetch(`/invoices/${invoice.id}/pdf`, {
+                credentials: 'include',
+            });
+            if (!response.ok) throw new Error('Failed to generate PDF');
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Invoice_INV-${invoice.invoice_number}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Error downloading PDF:', error);
+            window.location.href = `/invoices/${invoice.id}/pdf`;
         }
     };
 
@@ -250,9 +203,9 @@ export default function Quotation({
         switch (status) {
             case 'pending':
                 return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/50';
-            case 'approved':
+            case 'paid':
                 return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800/50';
-            case 'rejected':
+            case 'void':
                 return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-800/50';
             default:
                 return 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800/50 dark:text-slate-300 dark:border-slate-700';
@@ -261,11 +214,11 @@ export default function Quotation({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Manage Quotation" />
+            <Head title="Manage Invoices" />
 
-            {/* Quotation Summary Cards */}
+            {/* Invoice Summary Cards */}
             <div className="grid grid-cols-1 gap-6 px-6 py-4 md:grid-cols-2 lg:grid-cols-4">
-                {quotationSummary.map((summary, index) => {
+                {invoiceSummary.map((summary, index) => {
                     const colors = [
                         'from-blue-500 to-blue-600',
                         'from-amber-500 to-amber-600',
@@ -286,20 +239,20 @@ export default function Quotation({
                 })}
             </div>
 
-            {/* Quotation Table */}
+            {/* Invoice Table */}
             <div className="px-6 pb-6">
                 <Card className="border shadow-sm">
                     <CardHeader className="flex flex-row items-center justify-between border-b bg-muted/30">
                         <div>
-                            <h2 className="text-2xl font-bold text-foreground">Quotations</h2>
-                            <p className="mt-1 text-sm text-muted-foreground">Manage and track all quotation requests</p>
+                            <h2 className="text-2xl font-bold text-foreground">Invoices</h2>
+                            <p className="mt-1 text-sm text-muted-foreground">Manage and track all invoices</p>
                         </div>
                         <Button
-                            onClick={() => router.get('/quotation/create')}
+                            onClick={() => router.get('/invoices/create')}
                             className="flex items-center gap-2 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
                         >
                             <PlusIcon className="h-4 w-4" />
-                            Generate New Quotation
+                            Create New Invoice
                         </Button>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -310,7 +263,7 @@ export default function Quotation({
                                     <SearchIcon className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                     <Input
                                         type="text"
-                                        placeholder="Search quotations by ID, client name, service type, or status..."
+                                        placeholder="Search invoices by ID, client name, or status..."
                                         value={searchInput}
                                         onChange={(e) => setSearchInput(e.target.value)}
                                         className="pr-9 pl-9"
@@ -335,23 +288,23 @@ export default function Quotation({
                                     </Button>
                                 )}
                             </form>
-                            {search && quotations && (
+                            {search && invoices && (
                                 <p className="mt-2 text-sm text-muted-foreground">
-                                    Showing results for: <span className="font-medium text-foreground">&quot;{search}&quot;</span> ({quotations.total}{' '}
-                                    {quotations.total === 1 ? 'result' : 'results'})
+                                    Showing results for: <span className="font-medium text-foreground">&quot;{search}&quot;</span> ({invoices.total}{' '}
+                                    {invoices.total === 1 ? 'result' : 'results'})
                                 </p>
                             )}
                         </div>
-                        {!quotations?.data || quotations.data.length === 0 ? (
+                        {!invoices?.data || invoices.data.length === 0 ? (
                             <div className="py-16 text-center">
                                 <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-muted">
                                     <PlusIcon className="h-12 w-12 text-muted-foreground" />
                                 </div>
-                                <p className="mb-2 text-lg font-medium text-foreground">No quotations found</p>
-                                <p className="mb-6 text-sm text-muted-foreground">Get started by creating a new quotation</p>
-                                <Button onClick={() => router.get('/quotation/create')} className="gap-2">
+                                <p className="mb-2 text-lg font-medium text-foreground">No invoices found</p>
+                                <p className="mb-6 text-sm text-muted-foreground">Get started by creating a new invoice</p>
+                                <Button onClick={() => router.get('/invoices/create')} className="gap-2">
                                     <PlusIcon className="h-4 w-4" />
-                                    Generate New Quotation
+                                    Create New Invoice
                                 </Button>
                             </div>
                         ) : (
@@ -360,115 +313,92 @@ export default function Quotation({
                                     <Table>
                                         <TableHeader>
                                             <TableRow className="border-b bg-muted/50 hover:bg-muted/50">
-                                                <TableHead className="h-12 text-sm font-semibold text-foreground">Quotation ID</TableHead>
+                                                <TableHead className="h-12 text-sm font-semibold text-foreground">Invoice ID</TableHead>
                                                 <TableHead className="h-12 text-sm font-semibold text-foreground">Client</TableHead>
-                                                <TableHead className="h-12 text-sm font-semibold text-foreground">Service Type</TableHead>
+                                                <TableHead className="h-12 text-sm font-semibold text-foreground">Date</TableHead>
+                                                <TableHead className="h-12 text-sm font-semibold text-foreground">Due Date</TableHead>
+                                                <TableHead className="h-12 text-sm font-semibold text-foreground">Amount</TableHead>
                                                 <TableHead className="h-12 text-sm font-semibold text-foreground">Status</TableHead>
-                                                <TableHead className="h-12 text-sm font-semibold text-foreground">Created Date</TableHead>
                                                 <TableHead className="h-12 text-right text-sm font-semibold text-foreground">Actions</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {quotations.data.map((quotation) => (
-                                                <TableRow key={quotation.id} className="border-b transition-colors duration-150 hover:bg-muted/30">
+                                            {invoices.data.map((invoice) => (
+                                                <TableRow key={invoice.id} className="border-b transition-colors duration-150 hover:bg-muted/30">
                                                     <TableCell className="py-4">
                                                         <span className="font-medium text-foreground">
-                                                            QTN-{quotation.quotation_number}
+                                                            INV-{invoice.invoice_number}
                                                         </span>
+                                                        {invoice.quotation && (
+                                                            <div className="text-xs text-muted-foreground">
+                                                                Ref: QTN-{invoice.quotation.quotation_number}
+                                                            </div>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell className="py-4">
-                                                        <span className="font-medium text-foreground">{quotation.client?.company_name || 'N/A'}</span>
+                                                        <span className="font-medium text-foreground">{invoice.client?.company_name || 'N/A'}</span>
                                                     </TableCell>
                                                     <TableCell className="py-4">
                                                         <span className="text-sm text-muted-foreground">
-                                                            {serviceTypeLabels[
-                                                                quotation.quotation_request?.service_type as keyof typeof serviceTypeLabels
-                                                            ] || 'N/A'}
+                                                            {new Date(invoice.invoice_date).toLocaleDateString()}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell className="py-4">
+                                                        <span className="text-sm text-muted-foreground">
+                                                            {new Date(invoice.due_date).toLocaleDateString()}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell className="py-4">
+                                                        <span className="font-medium text-foreground">
+                                                            {invoice.currency} {Number(invoice.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                                         </span>
                                                     </TableCell>
                                                     <TableCell className="py-4">
                                                         <Badge
-                                                            className={`${getStatusColor(quotation.quotation_status)} border px-3 py-1 text-xs font-semibold`}
+                                                            className={`${getStatusColor(invoice.status)} border px-3 py-1 text-xs font-semibold`}
                                                         >
-                                                            {quotation.quotation_status.charAt(0).toUpperCase() + quotation.quotation_status.slice(1)}
+                                                            {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
                                                         </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="py-4">
-                                                        <span className="text-sm text-muted-foreground">
-                                                            {new Date(quotation.created_at).toLocaleDateString()}
-                                                        </span>
                                                     </TableCell>
                                                     <TableCell className="py-4">
                                                         <div className="flex items-center justify-end gap-2">
                                                             <Button
                                                                 variant="ghost"
                                                                 size="sm"
-                                                                onClick={() => router.get(`/quotation/${quotation.id}`)}
+                                                                onClick={() => router.get(`/invoices/${invoice.id}`)}
                                                                 className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
-                                                                title="View quotation"
+                                                                title="View invoice"
                                                             >
                                                                 <EyeIcon className="h-4 w-4" />
                                                             </Button>
                                                             <Button
                                                                 variant="ghost"
                                                                 size="sm"
-                                                                onClick={() => router.get(`/quotation/${quotation.id}/edit`)}
+                                                                onClick={() => router.get(`/invoices/${invoice.id}/edit`)}
                                                                 className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
-                                                                title="Edit quotation"
+                                                                title="Edit invoice"
                                                             >
                                                                 <PencilIcon className="h-4 w-4" />
                                                             </Button>
                                                             <Button
                                                                 variant="ghost"
                                                                 size="sm"
-                                                                onClick={() => handleDownloadPdf(quotation)}
-                                                                disabled={quotation.quotation_status !== 'approved' || isSubmitting}
-                                                                className={`h-8 w-8 p-0 ${
-                                                                    quotation.quotation_status === 'approved'
-                                                                        ? 'hover:bg-primary/10 hover:text-primary'
-                                                                        : 'cursor-not-allowed text-muted-foreground/30'
-                                                                }`}
-                                                                title={
-                                                                    quotation.quotation_status === 'approved'
-                                                                        ? 'Download PDF'
-                                                                        : 'PDF available only for approved quotations'
-                                                                }
+                                                                onClick={() => handleDownloadPdf(invoice)}
+                                                                className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
+                                                                title="Download PDF"
                                                             >
                                                                 <FileDown className="h-4 w-4" />
                                                             </Button>
-                                                            {quotation.quotation_status === 'approved' && (
+                                                            {invoice.status === 'pending' && (
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="sm"
-                                                                    onClick={() => router.post(`/quotation/${quotation.id}/convert`)}
-                                                                    className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:text-blue-500 dark:hover:bg-blue-950/30"
-                                                                    title="Convert to Invoice"
-                                                                >
-                                                                    <FileText className="h-4 w-4" />
-                                                                </Button>
-                                                            )}
-                                                            {quotation.quotation_status !== 'approved' && (
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    onClick={() => handleStatusUpdate(quotation, 'approved')}
+                                                                    onClick={() => handleStatusUpdate(invoice, 'paid')}
                                                                     disabled={isSubmitting}
                                                                     className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-500 dark:hover:bg-emerald-950/30"
-                                                                    title="Approve quotation"
+                                                                    title="Mark as Paid"
                                                                 >
                                                                     <CheckCircle className="h-4 w-4" />
-                                                                </Button>
-                                                            )}
-                                                            {quotation.quotation_status !== 'rejected' && (
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    onClick={() => handleStatusUpdate(quotation, 'rejected')}
-                                                                    disabled={isSubmitting}
-                                                                    className="h-8 w-8 p-0 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:text-rose-500 dark:hover:bg-rose-950/30"
-                                                                    title="Reject quotation"
-                                                                >
-                                                                    <XCircle className="h-4 w-4" />
                                                                 </Button>
                                                             )}
                                                             <DropdownMenu>
@@ -484,14 +414,24 @@ export default function Quotation({
                                                                     </Button>
                                                                 </DropdownMenuTrigger>
                                                                 <DropdownMenuContent align="end" className="w-48">
+                                                                     {invoice.status !== 'void' && (
+                                                                         <DropdownMenuItem
+                                                                            onClick={() => handleStatusUpdate(invoice, 'void')}
+                                                                            disabled={isSubmitting}
+                                                                            className="gap-2 text-rose-600"
+                                                                        >
+                                                                            <XCircle className="h-4 w-4" />
+                                                                            Void Invoice
+                                                                        </DropdownMenuItem>
+                                                                    )}
                                                                     <DropdownMenuItem
-                                                                        onClick={() => handleDelete(quotation)}
+                                                                        onClick={() => handleDelete(invoice)}
                                                                         disabled={isSubmitting}
                                                                         variant="destructive"
                                                                         className="gap-2"
                                                                     >
                                                                         <TrashIcon className="h-4 w-4" />
-                                                                        Delete Quotation
+                                                                        Delete Invoice
                                                                     </DropdownMenuItem>
                                                                 </DropdownMenuContent>
                                                             </DropdownMenu>
@@ -512,7 +452,7 @@ export default function Quotation({
                                                 value={per_page_request.toString()}
                                                 onValueChange={(value) => {
                                                     router.get(
-                                                        window.location.pathname,
+                                                        '/manage-invoices',
                                                         {
                                                             per_page: value,
                                                             page: 1,
@@ -535,9 +475,9 @@ export default function Quotation({
                                             <span className="text-sm text-muted-foreground">entries</span>
                                         </div>
                                         <div className="text-sm text-muted-foreground">
-                                            Showing <span className="font-medium text-foreground">{quotations?.from || 0}</span> to{' '}
-                                            <span className="font-medium text-foreground">{quotations?.to || 0}</span> of{' '}
-                                            <span className="font-medium text-foreground">{quotations?.total || 0}</span> results
+                                            Showing <span className="font-medium text-foreground">{invoices?.from || 0}</span> to{' '}
+                                            <span className="font-medium text-foreground">{invoices?.to || 0}</span> of{' '}
+                                            <span className="font-medium text-foreground">{invoices?.total || 0}</span> results
                                         </div>
                                     </div>
                                     <div className="flex justify-center">
@@ -548,11 +488,11 @@ export default function Quotation({
                                                         href="#"
                                                         onClick={(e) => {
                                                             e.preventDefault();
-                                                            if (quotations && quotations.current_page > 1) {
+                                                            if (invoices && invoices.current_page > 1) {
                                                                 router.get(
-                                                                    window.location.pathname,
+                                                                   '/manage-invoices',
                                                                     {
-                                                                        page: quotations.current_page - 1,
+                                                                        page: invoices.current_page - 1,
                                                                         per_page: per_page_request,
                                                                         search: search,
                                                                     },
@@ -561,12 +501,12 @@ export default function Quotation({
                                                             }
                                                         }}
                                                         className={
-                                                            !quotations || quotations.current_page <= 1 ? 'pointer-events-none opacity-50' : ''
+                                                            !invoices || invoices.current_page <= 1 ? 'pointer-events-none opacity-50' : ''
                                                         }
                                                     />
                                                 </PaginationItem>
 
-                                                {quotations?.links?.slice(1, -1).map((link, index) => {
+                                                {invoices?.links?.slice(1, -1).map((link, index) => {
                                                     if (link.label === '...') {
                                                         return (
                                                             <PaginationItem key={index}>
@@ -584,7 +524,7 @@ export default function Quotation({
                                                                 onClick={(e) => {
                                                                     e.preventDefault();
                                                                     router.get(
-                                                                        window.location.pathname,
+                                                                        '/manage-invoices',
                                                                         {
                                                                             page: pageNumber,
                                                                             per_page: per_page_request,
@@ -606,11 +546,11 @@ export default function Quotation({
                                                         href="#"
                                                         onClick={(e) => {
                                                             e.preventDefault();
-                                                            if (quotations.current_page < quotations.last_page) {
+                                                            if (invoices.current_page < invoices.last_page) {
                                                                 router.get(
-                                                                    window.location.pathname,
+                                                                    '/manage-invoices',
                                                                     {
-                                                                        page: quotations.current_page + 1,
+                                                                        page: invoices.current_page + 1,
                                                                         per_page: per_page_request,
                                                                         search: search,
                                                                     },
@@ -619,7 +559,7 @@ export default function Quotation({
                                                             }
                                                         }}
                                                         className={
-                                                            quotations.current_page >= quotations.last_page ? 'pointer-events-none opacity-50' : ''
+                                                            invoices.current_page >= invoices.last_page ? 'pointer-events-none opacity-50' : ''
                                                         }
                                                     />
                                                 </PaginationItem>
@@ -633,94 +573,6 @@ export default function Quotation({
                 </Card>
             </div>
 
-            {/* Create Quotation Dialog */}
-            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle className="text-2xl font-bold">Add New Quotation</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={submitCreate} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <Label htmlFor="create_client_id">Client *</Label>
-                                <Select
-                                    value={createForm.client_id}
-                                    onValueChange={(value) => setCreateForm({ ...createForm, client_id: value })}
-                                    required
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select a client" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {clients.map((client) => (
-                                            <SelectItem key={client.id} value={client.id.toString()}>
-                                                {client.company_name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label htmlFor="create_quotation_request_id">Quotation Request *</Label>
-                                <Select
-                                    value={createForm.quotation_request_id}
-                                    onValueChange={(value) => setCreateForm({ ...createForm, quotation_request_id: value })}
-                                    required
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select a request" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {quotation_requests.map((request) => (
-                                            <SelectItem key={request.id} value={request.id.toString()}>
-                                                {request.service_type}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label htmlFor="create_quotation_status">Status *</Label>
-                                <Select
-                                    value={createForm.quotation_status}
-                                    onValueChange={(value: 'pending' | 'approved' | 'rejected') =>
-                                        setCreateForm({ ...createForm, quotation_status: value })
-                                    }
-                                    required
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="pending">Pending</SelectItem>
-                                        <SelectItem value="approved">Approved</SelectItem>
-                                        <SelectItem value="rejected">Rejected</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="col-span-2">
-                                <Label htmlFor="create_quotation_message">Quotation Message *</Label>
-                                <Input
-                                    id="create_quotation_message"
-                                    value={createForm.quotation_message}
-                                    onChange={(e) => setCreateForm({ ...createForm, quotation_message: e.target.value })}
-                                    required
-                                    placeholder="Enter quotation details..."
-                                />
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)} disabled={isSubmitting}>
-                                Cancel
-                            </Button>
-                            <Button type="submit" disabled={isSubmitting}>
-                                {isSubmitting ? 'Creating...' : 'Create Quotation'}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
-
             {/* Delete Confirmation Dialog */}
             <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <DialogContent className="max-w-md">
@@ -731,13 +583,13 @@ export default function Quotation({
                         <AlertTriangle className="h-4 w-4 text-destructive" />
                         <AlertTitle className="font-semibold">Warning</AlertTitle>
                         <AlertDescription className="text-sm">
-                            This action cannot be undone. This will permanently delete the quotation.
+                            This action cannot be undone. This will permanently delete the invoice.
                         </AlertDescription>
                     </Alert>
-                    {selectedQuotation && (
+                    {selectedInvoice && (
                         <div className="py-4">
                             <p className="text-sm">
-                                Are you sure you want to delete quotation <strong>QTN-{selectedQuotation.quotation_number}</strong>?
+                                Are you sure you want to delete invoice <strong>INV-{selectedInvoice.invoice_number}</strong>?
                             </p>
                         </div>
                     )}
@@ -746,7 +598,7 @@ export default function Quotation({
                             Cancel
                         </Button>
                         <Button variant="destructive" onClick={confirmDelete} disabled={isSubmitting}>
-                            {isSubmitting ? 'Deleting...' : 'Delete Quotation'}
+                            {isSubmitting ? 'Deleting...' : 'Delete Invoice'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

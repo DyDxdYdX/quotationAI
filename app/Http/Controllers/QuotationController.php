@@ -150,7 +150,15 @@ class QuotationController extends Controller
             ->where('client_id', $client->id)
             ->firstOrFail();
 
-        Quotation::create($validated);
+        // Generate Quotation Number
+        $latestQuotation = Quotation::whereHas('client', function ($query) use ($userId) {
+            $query->where('user_id', $userId);
+        })->orderBy('id', 'desc')->first();
+
+        $nextNumber = $latestQuotation ? intval($latestQuotation->quotation_number) + 1 : 1;
+        $quotationNumber = str_pad($nextNumber, 6, '0', STR_PAD_LEFT);
+
+        Quotation::create(array_merge($validated, ['quotation_number' => $quotationNumber]));
 
         return redirect()->route('manage-quotation')->with('success', 'Quotation created successfully.');
     }
@@ -198,10 +206,19 @@ class QuotationController extends Controller
             // Call Google Gemini API
             $aiResponse = $geminiController->callGeminiAPI($prompt);
 
+            // Generate Quotation Number
+            $latestQuotation = Quotation::whereHas('client', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })->orderBy('id', 'desc')->first();
+
+            $nextNumber = $latestQuotation ? intval($latestQuotation->quotation_number) + 1 : 1;
+            $quotationNumber = str_pad($nextNumber, 6, '0', STR_PAD_LEFT);
+
             // Save quotation with AI response and project dates
             $quotation = Quotation::create([
                 'client_id' => $validated['client_id'],
                 'quotation_request_id' => $quotationRequest->id,
+                'quotation_number' => $quotationNumber,
                 'quotation_message' => $aiResponse,
                 'quotation_status' => 'pending',
                 'start_date' => $validated['start_date'] ?? null,

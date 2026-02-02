@@ -84,6 +84,33 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
+        // Invoice Analytics
+        $totalInvoices = \App\Models\Invoice::whereHas('client', function ($query) use ($userId) {
+            $query->where('user_id', $userId);
+        })->count();
+
+        $pendingInvoices = \App\Models\Invoice::where('status', 'pending')
+            ->whereHas('client', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })->count();
+
+        $paidInvoices = \App\Models\Invoice::where('status', 'paid')
+            ->whereHas('client', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })->count();
+
+        $voidInvoices = \App\Models\Invoice::where('status', 'void')
+            ->whereHas('client', function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })->count();
+
+        // Invoices by status for pie chart
+        $invoicesByStatus = [
+            ['name' => 'Pending', 'value' => $pendingInvoices, 'fill' => 'hsl(var(--chart-4))'], // Amber
+            ['name' => 'Paid', 'value' => $paidInvoices, 'fill' => 'hsl(var(--chart-3))'], // Green
+            ['name' => 'Void', 'value' => $voidInvoices, 'fill' => 'hsl(var(--chart-5))'], // Red
+        ];
+
         return Inertia::render('dashboard', [
             'analytics' => [
                 'totalClients' => $totalClients,
@@ -92,9 +119,15 @@ class DashboardController extends Controller
                 'pendingQuotations' => $pendingQuotations,
                 'approvedQuotations' => $approvedQuotations,
                 'rejectedQuotations' => $rejectedQuotations,
+                // Invoice Stats
+                'totalInvoices' => $totalInvoices,
+                'pendingInvoices' => $pendingInvoices,
+                'paidInvoices' => $paidInvoices,
+                'voidInvoices' => $voidInvoices,
             ],
             'chartData' => [
                 'quotationsByStatus' => $quotationsByStatus,
+                'invoicesByStatus' => $invoicesByStatus,
                 'serviceTypesData' => $serviceTypesData,
                 'monthlyData' => $monthlyData,
             ],

@@ -9,6 +9,7 @@ class Quotation extends Model
     protected $fillable = [
         'client_id',
         'quotation_request_id',
+        'quotation_number',
         'quotation_message',
         'quotation_status',
         'start_date',

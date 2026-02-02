@@ -2,7 +2,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -99,6 +100,8 @@ export default function Quotation({
 }) {
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+    const [includeSst, setIncludeSst] = useState(false);
     const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null);
     const [createForm, setCreateForm] = useState({
         client_id: '',
@@ -220,29 +223,37 @@ export default function Quotation({
         );
     };
 
-    const handleDownloadPdf = async (quotation: Quotation) => {
-        // Only allow download if status is approved
-        if (quotation.quotation_status === 'approved') {
-            try {
-                const response = await fetch(`/quotation/${quotation.id}/pdf`, {
-                    credentials: 'include', // Include cookies for authentication
-                });
-                if (!response.ok) throw new Error('Failed to generate PDF');
-                
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `Quotation_QTN-${quotation.id.toString().padStart(6, '0')}.pdf`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
-            } catch (error) {
-                console.error('Error downloading PDF:', error);
-                // Fallback to direct navigation
-                window.location.href = `/quotation/${quotation.id}/pdf`;
-            }
+    const handleDownloadPdf = (quotation: Quotation) => {
+        setSelectedQuotation(quotation);
+        setIncludeSst(false);
+        setDownloadDialogOpen(true);
+    };
+
+    const executeDownload = async () => {
+        if (!selectedQuotation || selectedQuotation.quotation_status !== 'approved') return;
+
+        try {
+            const response = await fetch(`/quotation/${selectedQuotation.id}/pdf?sst=${includeSst ? '1' : '0'}`, {
+                credentials: 'include', // Include cookies for authentication
+            });
+            if (!response.ok) throw new Error('Failed to generate PDF');
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Quotation_QTN-${selectedQuotation.quotation_number}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            setDownloadDialogOpen(false);
+            setSelectedQuotation(null);
+        } catch (error) {
+            console.error('Error downloading PDF:', error);
+            // Fallback to direct navigation
+            window.location.href = `/quotation/${selectedQuotation.id}/pdf?sst=${includeSst ? '1' : '0'}`;
+            setDownloadDialogOpen(false);
         }
     };
 
@@ -748,6 +759,30 @@ export default function Quotation({
                         <Button variant="destructive" onClick={confirmDelete} disabled={isSubmitting}>
                             {isSubmitting ? 'Deleting...' : 'Delete Quotation'}
                         </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Download Confirmation Dialog */}
+            <Dialog open={downloadDialogOpen} onOpenChange={setDownloadDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Download Quotation PDF</DialogTitle>
+                        <DialogDescription>
+                            Please confirm if you want to include SST in the quotation.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex items-center space-x-2 py-4">
+                        <Checkbox 
+                            id="includeSst" 
+                            checked={includeSst} 
+                            onCheckedChange={(checked) => setIncludeSst(!!checked)} 
+                        />
+                        <Label htmlFor="includeSst" className="cursor-pointer">Include 6% SST</Label>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDownloadDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={executeDownload}>Download</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

@@ -2,6 +2,15 @@ import QuotationRenderer from '@/components/quotation-renderer';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
@@ -64,6 +73,34 @@ const serviceTypeLabels = {
 
 export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
     const [isUpdating, setIsUpdating] = useState(false);
+    const [showDownloadModal, setShowDownloadModal] = useState(false);
+    const [includeSst, setIncludeSst] = useState(false);
+
+    const handleDownload = async () => {
+        if (quotation.quotation_status === 'approved') {
+            try {
+                const response = await fetch(`/quotation/${quotation.id}/pdf?sst=${includeSst ? '1' : '0'}`, {
+                    credentials: 'include', // Include cookies for authentication
+                });
+                if (!response.ok) throw new Error('Failed to generate PDF');
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `Quotation_QTN-${quotation.quotation_number}.pdf`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Error downloading PDF:', error);
+                // Fallback to direct navigation
+                window.location.href = `/quotation/${quotation.id}/pdf?sst=${includeSst ? '1' : '0'}`;
+            }
+            setShowDownloadModal(false);
+        }
+    };
 
     const handleStatusUpdate = (status: 'pending' | 'approved' | 'rejected') => {
         setIsUpdating(true);
@@ -313,30 +350,7 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
                                     )}
 
                                     <Button
-                                        onClick={async () => {
-                                            if (quotation.quotation_status === 'approved') {
-                                                try {
-                                                    const response = await fetch(`/quotation/${quotation.id}/pdf`, {
-                                                        credentials: 'include', // Include cookies for authentication
-                                                    });
-                                                    if (!response.ok) throw new Error('Failed to generate PDF');
-                                                    
-                                                    const blob = await response.blob();
-                                                    const url = window.URL.createObjectURL(blob);
-                                                    const link = document.createElement('a');
-                                                    link.href = url;
-                                                    link.download = `Quotation_QTN-${quotation.quotation_number}.pdf`;
-                                                    document.body.appendChild(link);
-                                                    link.click();
-                                                    document.body.removeChild(link);
-                                                    window.URL.revokeObjectURL(url);
-                                                } catch (error) {
-                                                    console.error('Error downloading PDF:', error);
-                                                    // Fallback to direct navigation
-                                                    window.location.href = `/quotation/${quotation.id}/pdf`;
-                                                }
-                                            }
-                                        }}
+                                        onClick={() => setShowDownloadModal(true)}
                                         variant="outline"
                                         className="gap-2 hover:bg-primary/10 hover:text-primary"
                                         disabled={quotation.quotation_status !== 'approved'}
@@ -392,6 +406,30 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
                     </Card>
                 </div>
             </div>
+
+
+            <Dialog open={showDownloadModal} onOpenChange={setShowDownloadModal}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Download Quotation PDF</DialogTitle>
+                        <DialogDescription>
+                            Please confirm if you want to include SST in the quotation.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex items-center space-x-2 py-4">
+                        <Checkbox 
+                            id="includeSst" 
+                            checked={includeSst} 
+                            onCheckedChange={(checked) => setIncludeSst(!!checked)} 
+                        />
+                        <Label htmlFor="includeSst" className="cursor-pointer">Include 6% SST</Label>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowDownloadModal(false)}>Cancel</Button>
+                        <Button onClick={handleDownload}>Download</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

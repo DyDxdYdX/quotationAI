@@ -382,8 +382,10 @@ class QuotationController extends Controller
             'company_website' => ($user && isset($user->company_website)) ? $user->company_website : '',
         ];
         
+        $includeSst = $request->boolean('sst', false);
+        
         // Generate PDF from blade view
-        $pdf = Pdf::loadView('quotation-pdf', compact('quotation', 'companyProfile'));
+        $pdf = Pdf::loadView('quotation-pdf', compact('quotation', 'companyProfile', 'includeSst'));
         
         // Set PDF options
         $pdf->setPaper('A4', 'portrait');

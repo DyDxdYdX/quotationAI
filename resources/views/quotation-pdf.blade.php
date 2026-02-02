@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -166,6 +167,7 @@
         }
     </style>
 </head>
+
 <body>
     <!-- Letterhead -->
     <div class="letterhead">
@@ -197,12 +199,12 @@
         <strong>Quotation No.:</strong> QTN-{{ str_pad($quotation->id, 6, '0', STR_PAD_LEFT) }}<br>
         <strong>Date:</strong> {{ date('d F Y', strtotime($quotation->created_at)) }}<br>
         @if($quotation->start_date)
-        <strong>Project Start Date:</strong> {{ date('d F Y', strtotime($quotation->start_date)) }}<br>
+            <strong>Project Start Date:</strong> {{ date('d F Y', strtotime($quotation->start_date)) }}<br>
         @endif
         @if($quotation->end_date)
-        <strong>Project End Date:</strong> {{ date('d F Y', strtotime($quotation->end_date)) }}<br>
+            <strong>Project End Date:</strong> {{ date('d F Y', strtotime($quotation->end_date)) }}<br>
         @elseif($quotation->start_date)
-        <strong>Project End Date:</strong> To be determined (duration suggested in timeline)<br>
+            <strong>Project End Date:</strong> To be determined (duration suggested in timeline)<br>
         @endif
         @if($quotation->start_date && $quotation->end_date)
             @php
@@ -212,7 +214,7 @@
                 $weeks = ceil($diff->days / 7);
                 $months = $diff->m + ($diff->y * 12);
             @endphp
-            <strong>Project Duration:</strong> 
+            <strong>Project Duration:</strong>
             @if($months > 0)
                 {{ $months }} month(s) ({{ $weeks }} weeks)
             @else
@@ -224,22 +226,22 @@
     <!-- Recipient -->
     <div class="recipient">
         @if($quotation->client)
-        {{ $quotation->client->supervisor_name }}<br>
-        <strong>{{ $quotation->client->company_name }}</strong><br>
-        @if($quotation->client->company_registration_number)
-        Registration No.: {{ $quotation->client->company_registration_number }}<br>
-        @endif
-        Email: {{ $quotation->client->company_email }}<br>
-        Tel: {{ $quotation->client->company_phone_number }}
+            {{ $quotation->client->supervisor_name }}<br>
+            <strong>{{ $quotation->client->company_name }}</strong><br>
+            @if($quotation->client->company_registration_number)
+                Registration No.: {{ $quotation->client->company_registration_number }}<br>
+            @endif
+            Email: {{ $quotation->client->company_email }}<br>
+            Tel: {{ $quotation->client->company_phone_number }}
         @endif
     </div>
 
     <!-- Subject -->
     <div class="subject">
-        <strong>SUBJECT: QUOTATION FOR 
-        @if($quotation->quotationRequest)
-            {{ strtoupper(str_replace('_', ' ', $quotation->quotationRequest->service_type)) }} SERVICES
-        @endif
+        <strong>SUBJECT: QUOTATION FOR
+            @if($quotation->quotationRequest)
+                {{ strtoupper(str_replace('_', ' ', $quotation->quotationRequest->service_type)) }} SERVICES
+            @endif
         </strong>
     </div>
 
@@ -253,60 +255,63 @@
         <p>With reference to your request for a quotation, we are pleased to submit our proposal as follows:</p>
 
         @php
-            $quotationData = is_string($quotation->quotation_message) 
-                ? json_decode($quotation->quotation_message, true) 
+            $quotationData = is_string($quotation->quotation_message)
+                ? json_decode($quotation->quotation_message, true)
                 : $quotation->quotation_message;
-            
+
             // Check if this is the new structured format
             $isStructuredFormat = isset($quotationData['quotation']) && isset($quotationData['quotation']['sections']) && is_array($quotationData['quotation']['sections']);
-            
+
             // Check if this is the new text format
             $isTextFormat = !$isStructuredFormat && isset($quotationData['format']) && $quotationData['format'] === 'text' && isset($quotationData['content']);
             $content = $isTextFormat ? $quotationData['content'] : null;
-            
+
             // Extract JSON from markdown code blocks
-            function extractJsonFromContent($text) {
+            function extractJsonFromContent($text)
+            {
                 if (preg_match('/```json\s*([\s\S]*?)\s*```/', $text, $matches)) {
                     $json = json_decode($matches[1], true);
                     return $json;
                 }
                 return null;
             }
-            
+
             // Parse markdown sections
-            function parseMarkdownSection($content, $sectionNumber, $sectionTitle) {
+            function parseMarkdownSection($content, $sectionNumber, $sectionTitle)
+            {
                 // More flexible pattern - match section number and partial title
                 // Handles variations like "**1. PROJECT OVERVIEW AND SCOPE**" or "**1. PROJECT OVERVIEW**"
                 $titleWords = explode(' ', $sectionTitle);
                 $titlePattern = implode('.*', array_map('preg_quote', $titleWords));
-                
+
                 // Try exact match first
                 $pattern = '/\*\*' . preg_quote($sectionNumber, '/') . '\.\s*' . preg_quote($sectionTitle, '/') . '\*\*([\s\S]*?)(?=\*\*\d+\.|$)/i';
                 if (preg_match($pattern, $content, $matches)) {
                     return trim($matches[1]);
                 }
-                
+
                 // Try flexible match with key words
                 $pattern = '/\*\*' . preg_quote($sectionNumber, '/') . '\.\s*.*?' . $titlePattern . '.*?\*\*([\s\S]*?)(?=\*\*\d+\.|$)/i';
                 if (preg_match($pattern, $content, $matches)) {
                     return trim($matches[1]);
                 }
-                
+
                 // Try just section number
                 $pattern = '/\*\*' . preg_quote($sectionNumber, '/') . '\.\s*[^*]+\*\*([\s\S]*?)(?=\*\*\d+\.|$)/i';
                 if (preg_match($pattern, $content, $matches)) {
                     return trim($matches[1]);
                 }
-                
+
                 return null;
             }
-            
+
             // Parse markdown table
-            function parseMarkdownTable($text) {
+            function parseMarkdownTable($text)
+            {
                 $lines = explode("\n", $text);
                 $tableLines = [];
                 $inTable = false;
-                
+
                 foreach ($lines as $line) {
                     $trimmed = trim($line);
                     if (strpos($trimmed, '|') !== false && !preg_match('/^\|\s*:?-+:?\s*\|$/', $trimmed)) {
@@ -316,19 +321,20 @@
                         break;
                     }
                 }
-                
-                if (count($tableLines) < 2) return null;
-                
+
+                if (count($tableLines) < 2)
+                    return null;
+
                 $headers = array_map('trim', explode('|', $tableLines[0]));
                 $headers = array_filter($headers);
                 $headers = array_values($headers);
-                
+
                 $rows = [];
                 for ($i = 1; $i < count($tableLines); $i++) {
                     $values = array_map('trim', explode('|', $tableLines[$i]));
                     $values = array_filter($values);
                     $values = array_values($values);
-                    
+
                     if (count($values) >= count($headers)) {
                         $row = [];
                         foreach ($headers as $idx => $header) {
@@ -337,35 +343,38 @@
                         $rows[] = $row;
                     }
                 }
-                
+
                 return ['headers' => $headers, 'rows' => $rows];
             }
-            
+
             // Parse markdown list
-            function parseMarkdownList($text) {
+            function parseMarkdownList($text)
+            {
                 $items = [];
                 $lines = explode("\n", $text);
-                
+
                 foreach ($lines as $line) {
                     $trimmed = trim($line);
                     if (preg_match('/^\s*[\*\-\•]\s+(.+)$/', $trimmed, $matches)) {
                         $items[] = trim($matches[1]);
                     }
                 }
-                
+
                 return $items;
             }
-            
+
             // Render text with basic markdown formatting (bold, lists)
-            function renderMarkdownText($text) {
+            function renderMarkdownText($text)
+            {
                 // Split into blocks (paragraphs, lists, etc.)
                 $blocks = preg_split('/\n\n+/', $text);
                 $output = '';
-                
+
                 foreach ($blocks as $block) {
                     $block = trim($block);
-                    if (empty($block)) continue;
-                    
+                    if (empty($block))
+                        continue;
+
                     // Check if it's a list
                     if (preg_match('/^\s*[\*\-\•]/m', $block)) {
                         $items = parseMarkdownList($block);
@@ -397,17 +406,19 @@
                         $output .= '<p>' . nl2br($block) . '</p>';
                     }
                 }
-                
+
                 return $output;
             }
-            
+
             // Format currency
-            function formatCurrency($amount, $currency = 'RM') {
+            function formatCurrency($amount, $currency = 'RM')
+            {
                 return $currency . ' ' . number_format($amount, 2, '.', ',');
             }
-            
+
             // Calculate total from cost breakdown (system-controlled)
-            function calculateTotal($costBreakdown) {
+            function calculateTotal($costBreakdown)
+            {
                 $total = 0;
                 if (isset($costBreakdown['cost_breakdown']) && is_array($costBreakdown['cost_breakdown'])) {
                     foreach ($costBreakdown['cost_breakdown'] as $key => $value) {
@@ -418,24 +429,25 @@
                 }
                 return $total;
             }
-            
+
             // Render cost breakdown table (system calculates total)
-            function renderCostBreakdownTable($costBreakdown, $currency = 'RM') {
+            function renderCostBreakdownTable($costBreakdown, $currency = 'RM', $includeSst = false)
+            {
                 if (!isset($costBreakdown['cost_breakdown']) || !is_array($costBreakdown['cost_breakdown'])) {
                     return '';
                 }
-                
+
                 $output = '<table class="cost-table"><thead><tr><th>No.</th><th>Item</th><th>Description</th><th class="amount">Amount (' . $currency . ')</th></tr></thead><tbody>';
                 $counter = 1;
                 $total = 0;
-                
+
                 foreach ($costBreakdown['cost_breakdown'] as $key => $item) {
                     if (is_array($item) && isset($item['cost'])) {
                         $itemName = ucwords(str_replace('_', ' ', $key));
                         $description = isset($item['description']) ? htmlspecialchars($item['description']) : '';
                         $cost = (float) $item['cost'];
                         $total += $cost;
-                        
+
                         $output .= '<tr>';
                         $output .= '<td style="text-align: center;">' . $counter++ . '</td>';
                         $output .= '<td>' . htmlspecialchars($itemName) . '</td>';
@@ -444,27 +456,32 @@
                         $output .= '</tr>';
                     }
                 }
-                
+
                 // System calculates total
                 $output .= '<tr class="total-row">';
                 $output .= '<td colspan="3" style="text-align: right; padding-right: 20px;"><strong>SUBTOTAL</strong></td>';
                 $output .= '<td class="amount"><strong>' . formatCurrency($total, $currency) . '</strong></td>';
                 $output .= '</tr>';
-                
-                // Calculate SST (6%)
-                $sst = $total * 0.06;
-                $output .= '<tr>';
-                $output .= '<td colspan="3" style="text-align: right; padding-right: 20px;">SST (6%)</td>';
-                $output .= '<td class="amount">' . formatCurrency($sst, $currency) . '</td>';
-                $output .= '</tr>';
-                
-                // Grand total
-                $grandTotal = $total + $sst;
-                    $output .= '<tr class="total-row">';
-                $output .= '<td colspan="3" style="text-align: right; padding-right: 20px;"><strong>TOTAL AMOUNT (INCLUDING SST)</strong></td>';
-                $output .= '<td class="amount"><strong>' . formatCurrency($grandTotal, $currency) . '</strong></td>';
+
+                $grandTotal = $total;
+
+                if ($includeSst) {
+                    // Calculate SST (6%)
+                    $sst = $total * 0.06;
+                    $output .= '<tr>';
+                    $output .= '<td colspan="3" style="text-align: right; padding-right: 20px;">SST (6%)</td>';
+                    $output .= '<td class="amount">' . formatCurrency($sst, $currency) . '</td>';
                     $output .= '</tr>';
-                
+
+                    $grandTotal += $sst;
+                }
+
+                // Grand total
+                $output .= '<tr class="total-row">';
+                $output .= '<td colspan="3" style="text-align: right; padding-right: 20px;"><strong>TOTAL AMOUNT' . ($includeSst ? ' (INCLUDING SST)' : '') . '</strong></td>';
+                $output .= '<td class="amount"><strong>' . formatCurrency($grandTotal, $currency) . '</strong></td>';
+                $output .= '</tr>';
+
                 $output .= '</tbody></table>';
                 return $output;
             }
@@ -518,7 +535,7 @@
                                 'cost_breakdown' => $section['data']
                             ];
                         @endphp
-                        {!! renderCostBreakdownTable($costBreakdown, $currency) !!}
+                        {!! renderCostBreakdownTable($costBreakdown, $currency, $includeSst) !!}
                     </div>
                 @elseif($section['type'] === 'list' && isset($section['items']))
                     <div style="margin-bottom: 20px;">
@@ -548,9 +565,11 @@
                         <h3 class="section-title">{{ $section['title'] }}</h3>
                         @foreach($section['items'] as $item)
                             <div style="margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
-                                <p style="font-weight: bold; margin-bottom: 5px;">{!! htmlspecialchars($item['name'] ?? '', ENT_NOQUOTES, 'UTF-8') !!}</p>
+                                <p style="font-weight: bold; margin-bottom: 5px;">
+                                    {!! htmlspecialchars($item['name'] ?? '', ENT_NOQUOTES, 'UTF-8') !!}</p>
                                 @if(isset($item['availability']))
-                                    <p style="font-size: 10px; color: #666; margin-bottom: 5px;"><strong>Availability:</strong> {!! htmlspecialchars($item['availability'], ENT_NOQUOTES, 'UTF-8') !!}</p>
+                                    <p style="font-size: 10px; color: #666; margin-bottom: 5px;"><strong>Availability:</strong>
+                                        {!! htmlspecialchars($item['availability'], ENT_NOQUOTES, 'UTF-8') !!}</p>
                                 @endif
                                 @if(isset($item['description']))
                                     <p style="font-size: 11px;">{!! htmlspecialchars($item['description'], ENT_NOQUOTES, 'UTF-8') !!}</p>
@@ -566,9 +585,9 @@
             @php
                 // Extract JSON cost breakdown
                 $costBreakdownJson = extractJsonFromContent($content);
-                
+
                 // Parse sections - try multiple variations
-                $projectOverview = parseMarkdownSection($content, '1', 'PROJECT OVERVIEW') 
+                $projectOverview = parseMarkdownSection($content, '1', 'PROJECT OVERVIEW')
                     ?? parseMarkdownSection($content, '1', 'OVERVIEW');
                 $timelineSection = parseMarkdownSection($content, '2', 'TIMELINE')
                     ?? parseMarkdownSection($content, '2', 'DETAILED TIMELINE');
@@ -629,7 +648,7 @@
             @if($costBreakdownJson && isset($costBreakdownJson['cost_breakdown']))
                 <div style="margin-bottom: 20px;">
                     <h3 class="section-title">3. COST BREAKDOWN</h3>
-                    {!! renderCostBreakdownTable($costBreakdownJson, $costBreakdownJson['currency'] ?? 'RM') !!}
+                    {!! renderCostBreakdownTable($costBreakdownJson, $costBreakdownJson['currency'] ?? 'RM', $includeSst) !!}
                 </div>
             @endif
 
@@ -646,7 +665,7 @@
                             $milestonesTable = parseMarkdownTable($deliverablesSection);
                         }
                     @endphp
-                    
+
                     @if(count($deliverablesList) > 0)
                         <p><strong>Deliverables:</strong></p>
                         <ul class="deliverables-list">
@@ -655,7 +674,7 @@
                             @endforeach
                         </ul>
                     @endif
-                    
+
                     @if($milestonesTable)
                         <p style="margin-top: 15px;"><strong>Milestones:</strong></p>
                         <table class="cost-table">
@@ -707,47 +726,52 @@
         @else
             {{-- Old JSON Format (Backward Compatibility) --}}
             @php
-            function formatFieldName($key) {
-                return ucwords(str_replace('_', ' ', $key));
-            }
-            
-            function isMetaField($key) {
+                function formatFieldName($key)
+                {
+                    return ucwords(str_replace('_', ' ', $key));
+                }
+
+                function isMetaField($key)
+                {
                     $metaFields = ['ai_generated', 'generated_at', 'format', 'error', 'error_message', 'note'];
-                return in_array($key, $metaFields);
-            }
-            
-            function renderObject($data, $depth = 0) {
-                if (!is_array($data)) return '';
-                
-                $output = '';
-                foreach ($data as $key => $value) {
-                    if (isMetaField($key) || is_null($value)) continue;
-                    
-                    $output .= '<div style="margin-bottom: 15px;">';
-                    $output .= '<p><strong>' . formatFieldName($key) . ':</strong></p>';
-                    
-                    if (is_array($value)) {
+                    return in_array($key, $metaFields);
+                }
+
+                function renderObject($data, $depth = 0, $includeSst = false)
+                {
+                    if (!is_array($data))
+                        return '';
+
+                    $output = '';
+                    foreach ($data as $key => $value) {
+                        if (isMetaField($key) || is_null($value))
+                            continue;
+
+                        $output .= '<div style="margin-bottom: 15px;">';
+                        $output .= '<p><strong>' . formatFieldName($key) . ':</strong></p>';
+
+                        if (is_array($value)) {
                             if (isset($value['cost_breakdown']) || (strpos(strtolower($key), 'cost') !== false && !array_is_list($value))) {
-                                $output .= renderCostBreakdownTable($value);
+                                $output .= renderCostBreakdownTable($value, 'RM', $includeSst);
                             } elseif (array_is_list($value)) {
                                 $output .= '<ul class="deliverables-list">';
                                 foreach ($value as $item) {
                                     $output .= '<li>' . htmlspecialchars(is_array($item) ? json_encode($item) : $item) . '</li>';
                                 }
                                 $output .= '</ul>';
+                            } else {
+                                $output .= renderObject($value, $depth + 1, $includeSst);
+                            }
                         } else {
-                            $output .= renderObject($value, $depth + 1);
+                            $output .= '<p>' . htmlspecialchars($value) . '</p>';
                         }
-                    } else {
-                        $output .= '<p>' . htmlspecialchars($value) . '</p>';
+                        $output .= '</div>';
                     }
-                    $output .= '</div>';
+                    return $output;
                 }
-                return $output;
-            }
-        @endphp
+            @endphp
 
-        {!! renderObject($quotationData) !!}
+            {!! renderObject($quotationData, 0, $includeSst) !!}
         @endif
     </div>
 
@@ -771,7 +795,8 @@
         <br><br>
         <div class="signature-line"></div>
         <p><strong>Manager</strong><br>
-        {{ $companyProfile['company_name'] ?? 'Your Company Name' }}</p>
+            {{ $companyProfile['company_name'] ?? 'Your Company Name' }}</p>
     </div>
 </body>
+
 </html>

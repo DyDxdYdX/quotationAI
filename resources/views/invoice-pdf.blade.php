@@ -177,9 +177,12 @@
         <div class="invoice-title">
             <div class="title-text">INVOICE</div>
             <div class="invoice-meta">
-                <strong>Invoice #:</strong> INV-{{ str_pad($invoice->id, 6, '0', STR_PAD_LEFT) }}<br>
+                <strong>Invoice #:</strong> INV-{{ $invoice->invoice_number }}<br>
                 <strong>Date:</strong> {{ date('d F Y', strtotime($invoice->invoice_date)) }}<br>
                 <strong>Due Date:</strong> {{ date('d F Y', strtotime($invoice->due_date)) }}<br>
+                @if($invoice->phase_name)
+                    <strong>Milestone:</strong> {{ $invoice->phase_name }} ({{ number_format((float) $invoice->phase_percentage, 2) }}%)<br>
+                @endif
                 @if($invoice->status !== 'pending')
                     <strong style="color: {{ $invoice->status === 'paid' ? 'green' : 'red' }}; text-transform: uppercase;">
                         Status: {{ $invoice->status }}

@@ -13,6 +13,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
@@ -62,6 +63,15 @@ interface Quotation {
     quotation_request?: QuotationRequest;
 }
 
+interface BillingPhase {
+    phase_key: string;
+    phase_name: string;
+    phase_description: string;
+    phase_percentage: number;
+    amount: number;
+    currency: string;
+}
+
 const serviceTypeLabels = {
     web_development: 'Web Development',
     mobile_development: 'Mobile Development',
@@ -72,10 +82,23 @@ const serviceTypeLabels = {
     other: 'Other',
 };
 
-export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
+export default function ViewQuotation({
+    quotation,
+    billing_phases,
+    invoiced_phase_keys,
+}: {
+    quotation: Quotation;
+    billing_phases: BillingPhase[];
+    invoiced_phase_keys: string[];
+}) {
     const [isUpdating, setIsUpdating] = useState(false);
     const [showDownloadModal, setShowDownloadModal] = useState(false);
     const [includeSst, setIncludeSst] = useState(false);
+    const [showConvertModal, setShowConvertModal] = useState(false);
+    const [selectedPhaseKey, setSelectedPhaseKey] = useState<string>('');
+    const [isConverting, setIsConverting] = useState(false);
+
+    const availableBillingPhases = billing_phases.filter((phase) => !invoiced_phase_keys.includes(phase.phase_key));
 
     const handleDownload = async () => {
         if (quotation.quotation_status === 'approved') {
@@ -116,6 +139,23 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
                 },
                 onFinish: () => {
                     setIsUpdating(false);
+                },
+            },
+        );
+    };
+
+    const handleConvert = () => {
+        if (!selectedPhaseKey) {
+            return;
+        }
+
+        setIsConverting(true);
+        router.post(
+            `/quotation/${quotation.id}/convert`,
+            { phase_key: selectedPhaseKey },
+            {
+                onFinish: () => {
+                    setIsConverting(false);
                 },
             },
         );
@@ -342,11 +382,15 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
                                 <div className="flex flex-wrap gap-2">
                                     {quotation.quotation_status === 'approved' && (
                                         <Button
-                                            onClick={() => router.post(`/quotation/${quotation.id}/convert`)}
+                                            onClick={() => {
+                                                setSelectedPhaseKey('');
+                                                setShowConvertModal(true);
+                                            }}
                                             className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                                            disabled={availableBillingPhases.length === 0}
                                         >
                                             <FileText className="h-4 w-4" />
-                                            Convert to Invoice
+                                            {availableBillingPhases.length > 0 ? 'Convert to Phase Invoice' : 'All Phases Invoiced'}
                                         </Button>
                                     )}
 
@@ -426,6 +470,62 @@ export default function ViewQuotation({ quotation }: { quotation: Quotation }) {
                                     )}
                                 </div>
                             </div>
+
+                            <Dialog open={showConvertModal} onOpenChange={setShowConvertModal}>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Create Phase Invoice</DialogTitle>
+                                        <DialogDescription>
+                                            Select one milestone phase to generate a single invoice for that phase.
+                                        </DialogDescription>
+                                    </DialogHeader>
+
+                                    {availableBillingPhases.length === 0 ? (
+                                        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                                            All billable phases for this quotation have already been invoiced.
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <Label htmlFor="phase-key">Billable milestone</Label>
+                                            <Select value={selectedPhaseKey} onValueChange={setSelectedPhaseKey}>
+                                                <SelectTrigger id="phase-key">
+                                                    <SelectValue placeholder="Select a milestone phase" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {availableBillingPhases.map((phase) => (
+                                                        <SelectItem key={phase.phase_key} value={phase.phase_key}>
+                                                            {phase.phase_name} ({phase.phase_percentage}% - {phase.currency}{' '}
+                                                            {Number(phase.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })})
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+
+                                            {selectedPhaseKey && (
+                                                <div className="rounded-md border bg-muted/50 p-3 text-sm">
+                                                    {availableBillingPhases
+                                                        .filter((phase) => phase.phase_key === selectedPhaseKey)
+                                                        .map((phase) => (
+                                                            <p key={phase.phase_key}>{phase.phase_description}</p>
+                                                        ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <DialogFooter>
+                                        <Button variant="outline" onClick={() => setShowConvertModal(false)}>
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            onClick={handleConvert}
+                                            disabled={!selectedPhaseKey || availableBillingPhases.length === 0 || isConverting}
+                                        >
+                                            {isConverting ? 'Creating...' : 'Create Invoice'}
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
                         </CardContent>
                     </Card>
                 </div>

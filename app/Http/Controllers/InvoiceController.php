@@ -2,19 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Client;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
-use App\Models\Client;
 use App\Models\Quotation;
-use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth;
+use App\Services\QuotationMilestoneBillingService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
 
 class InvoiceController extends Controller
 {
+    public function __construct(public QuotationMilestoneBillingService $quotationMilestoneBillingService) {}
+
     /**
      * Display a listing of the resource.
      */
@@ -23,31 +25,31 @@ class InvoiceController extends Controller
         $per_page = $request->input('per_page', 10);
         $search = $request->input('search', '');
         $userId = $request->user()->id;
-        
+
         $query = Invoice::with(['client', 'quotation'])
             ->whereHas('client', function ($clientQuery) use ($userId) {
                 $clientQuery->where('user_id', $userId);
             });
-        
+
         // Apply search filter
-        if (!empty($search)) {
+        if (! empty($search)) {
             $query->where(function ($q) use ($search, $userId) {
                 // Search by invoice ID
-                $q->where('id', 'like', '%' . $search . '%')
+                $q->where('id', 'like', '%'.$search.'%')
                     // Search by client company name
                     ->orWhereHas('client', function ($clientQuery) use ($search, $userId) {
                         $clientQuery->where('user_id', $userId)
-                             ->where('company_name', 'like', '%' . $search . '%');
+                            ->where('company_name', 'like', '%'.$search.'%');
                     })
                     // Search by status
-                    ->orWhere('status', 'like', '%' . $search . '%');
+                    ->orWhere('status', 'like', '%'.$search.'%');
             });
         }
-        
+
         if ($per_page === 'all') {
             $invoices = $query->orderBy('created_at', 'desc')->get();
             // Manual pagination structure for 'all'
-             $paginatedInvoices = (object) [
+            $paginatedInvoices = (object) [
                 'data' => $invoices,
                 'current_page' => 1,
                 'last_page' => 1,
@@ -55,13 +57,13 @@ class InvoiceController extends Controller
                 'total' => $invoices->count(),
                 'from' => $invoices->count() > 0 ? 1 : null,
                 'to' => $invoices->count(),
-                'links' => []
+                'links' => [],
             ];
         } else {
             $paginatedInvoices = $query->orderBy('created_at', 'desc')->paginate((int) $per_page);
-             $paginatedInvoices->appends([
+            $paginatedInvoices->appends([
                 'per_page' => $per_page,
-                'search' => $search
+                'search' => $search,
             ]);
         }
 
@@ -81,102 +83,70 @@ class InvoiceController extends Controller
     public function convert(Request $request, Quotation $quotation)
     {
         $userId = $request->user()->id;
-        
+
         // Verify ownership
         if ($quotation->client->user_id !== $userId) {
             abort(403);
         }
 
-        // Check if invoice already exists for this quotation
-        $existingInvoice = Invoice::where('quotation_id', $quotation->id)->first();
-        if ($existingInvoice) {
-            return redirect()->route('invoices.show', $existingInvoice)->with('message', 'Invoice already exists for this quotation.');
+        $validated = $request->validate([
+            'phase_key' => ['required', 'string'],
+        ]);
+
+        $billablePhases = $this->quotationMilestoneBillingService->extractBillablePhases($quotation);
+        if (empty($billablePhases)) {
+            return back()->withErrors([
+                'phase_key' => 'No billable milestones were found for this quotation.',
+            ]);
         }
 
-        // Parse quotation message for costs
-        $quotationData = $quotation->quotation_message;
-        if (is_string($quotationData)) {
-            $quotationData = json_decode($quotationData, true);
+        $selectedPhase = collect($billablePhases)
+            ->firstWhere('phase_key', $validated['phase_key']);
+
+        if (! $selectedPhase) {
+            return back()->withErrors([
+                'phase_key' => 'The selected milestone phase is invalid.',
+            ]);
         }
 
-        $items = [];
-        $costBreakdown = null;
+        // Block duplicate billing for the same quotation phase
+        $existingPhaseInvoice = Invoice::where('quotation_id', $quotation->id)
+            ->where('phase_key', $selectedPhase['phase_key'])
+            ->first();
 
-        // Strategy 1: Check for sections array (New Structure)
-        if (isset($quotationData['quotation']['sections']) && is_array($quotationData['quotation']['sections'])) {
-            foreach ($quotationData['quotation']['sections'] as $section) {
-                if (isset($section['id']) && $section['id'] === 'cost_breakdown') {
-                    $costBreakdown = $section['data'] ?? null;
-                    break;
-                }
-            }
-        }
-        
-        // Strategy 2: Fallback to old structure checks if Strategy 1 failed
-        if (!$costBreakdown) {
-             $costBreakdown = $quotationData['cost_breakdown'] ?? ($quotationData['quotation']['cost_breakdown'] ?? null);
-        }
-
-        $totalAmount = 0;
-
-        if ($costBreakdown && is_array($costBreakdown)) {
-            foreach ($costBreakdown as $key => $item) {
-                // Handle both direct key-value pairs or nested objects
-                // In the new JSON, it is like "discovery_and_planning": { "description": "...", "cost": 8500 }
-                if (is_array($item) && isset($item['cost'])) {
-                    // Filter out summary keys if they exist in the object
-                    if (in_array($key, ['subtotal', 'total_project_cost', 'project_name', 'currency'])) continue;
-                    
-                    $formattedCost = $this->parseCost($item['cost']);
-                    $description = ucwords(str_replace('_', ' ', $key));
-                    
-                    if (isset($item['description']) && !empty($item['description'])) {
-                        $description .= ': ' . $item['description'];
-                    }
-
-                    $items[] = [
-                        'description' => $description,
-                        'quantity' => 1,
-                        'unit_price' => $formattedCost,
-                        'amount' => $formattedCost,
-                    ];
-                    
-                    $totalAmount += $formattedCost;
-                }
-            }
+        if ($existingPhaseInvoice) {
+            return redirect()
+                ->route('invoices.show', $existingPhaseInvoice)
+                ->with('message', 'An invoice for this phase already exists.');
         }
 
         // Generate Invoice Number
-        $latestInvoice = Invoice::whereHas('client', function ($query) use ($quotation) {
-            $query->where('user_id', $quotation->client->user_id);
-        })->latest()->first();
-
-        $nextNumber = $latestInvoice ? intval($latestInvoice->invoice_number) + 1 : 1;
-        $invoiceNumber = str_pad($nextNumber, 6, '0', STR_PAD_LEFT);
+        $invoiceNumber = $this->generateInvoiceNumber($quotation->client->user_id);
 
         // Create Invoice
         $invoice = Invoice::create([
             'client_id' => $quotation->client_id,
             'quotation_id' => $quotation->id,
+            'phase_key' => $selectedPhase['phase_key'],
+            'phase_name' => $selectedPhase['phase_name'],
+            'phase_description' => $selectedPhase['phase_description'],
+            'phase_percentage' => $selectedPhase['phase_percentage'],
             'invoice_number' => $invoiceNumber,
             'invoice_date' => now(),
             'due_date' => now()->addDays(14), // Default Net 14
             'status' => 'pending', // Draft/Pending
-            'currency' => $quotationData['quotation']['currency'] ?? 'RM',
-            'total_amount' => $totalAmount,
-            'notes' => 'Converted from Quotation #' . $quotation->id,
+            'currency' => $selectedPhase['currency'],
+            'total_amount' => $selectedPhase['amount'],
+            'notes' => 'Converted from Quotation #'.$quotation->id.' ('.$selectedPhase['phase_name'].')',
         ]);
 
-        // Create Invoice Items
-        foreach ($items as $item) {
-            InvoiceItem::create([
-                'invoice_id' => $invoice->id,
-                'description' => $item['description'],
-                'quantity' => $item['quantity'],
-                'unit_price' => $item['unit_price'],
-                'amount' => $item['amount'],
-            ]);
-        }
+        InvoiceItem::create([
+            'invoice_id' => $invoice->id,
+            'description' => $selectedPhase['phase_name'].': '.$selectedPhase['phase_description'],
+            'quantity' => 1,
+            'unit_price' => $selectedPhase['amount'],
+            'amount' => $selectedPhase['amount'],
+        ]);
 
         return redirect()->route('invoices.show', $invoice)->with('success', 'Quotation converted to draft invoice.');
     }
@@ -188,7 +158,7 @@ class InvoiceController extends Controller
     {
         $userId = $request->user()->id;
         $clients = Client::where('user_id', $userId)->orderBy('company_name')->get();
-        
+
         // Manual creation, empty form
         $prefilledItems = [[
             'description' => '',
@@ -202,14 +172,6 @@ class InvoiceController extends Controller
             'prefilled_data' => [],
             'prefilled_items' => $prefilledItems,
         ]);
-    }
-
-    protected function parseCost($cost) {
-        if (is_numeric($cost)) return (float)$cost;
-        if (is_string($cost)) {
-            return (float)preg_replace('/[^0-9.]/', '', $cost);
-        }
-        return 0;
     }
 
     /**
@@ -233,7 +195,7 @@ class InvoiceController extends Controller
             'items.*.unit_price' => 'required|numeric|min:0',
         ]);
 
-         // Verify the client belongs to the current user
+        // Verify the client belongs to the current user
         $client = Client::where('id', $validated['client_id'])
             ->where('user_id', $userId)
             ->firstOrFail();
@@ -245,12 +207,7 @@ class InvoiceController extends Controller
         }
 
         // Generate Invoice Number
-        $latestInvoice = Invoice::whereHas('client', function ($query) use ($userId) {
-            $query->where('user_id', $userId);
-        })->latest()->first();
-
-        $nextNumber = $latestInvoice ? intval($latestInvoice->invoice_number) + 1 : 1;
-        $invoiceNumber = str_pad($nextNumber, 6, '0', STR_PAD_LEFT);
+        $invoiceNumber = $this->generateInvoiceNumber($userId);
 
         $invoice = Invoice::create([
             'client_id' => $validated['client_id'],
@@ -283,9 +240,9 @@ class InvoiceController extends Controller
     public function show(Request $request, Invoice $invoice)
     {
         $userId = $request->user()->id;
-        
+
         $invoice->load(['client', 'quotation', 'items']);
-        
+
         if ($invoice->client->user_id !== $userId) {
             abort(403);
         }
@@ -301,7 +258,7 @@ class InvoiceController extends Controller
     public function edit(Request $request, Invoice $invoice)
     {
         $userId = $request->user()->id;
-        
+
         $invoice->load(['client', 'items']);
 
         // Verify ownership
@@ -323,7 +280,7 @@ class InvoiceController extends Controller
     public function update(Request $request, Invoice $invoice)
     {
         $userId = $request->user()->id;
-        
+
         $invoice->load('client');
         if ($invoice->client->user_id !== $userId) {
             abort(403);
@@ -331,11 +288,12 @@ class InvoiceController extends Controller
 
         // Handle simple status update from index/view (if just status is sent)
         if ($request->has('status') && count($request->all()) === 1) {
-             $validated = $request->validate([
+            $validated = $request->validate([
                 'status' => ['required', Rule::in(['pending', 'paid', 'void'])],
             ]);
-            
+
             $invoice->update(['status' => $validated['status']]);
+
             return back()->with('success', 'Invoice status updated.');
         }
 
@@ -394,45 +352,45 @@ class InvoiceController extends Controller
     /**
      * Generate PDF
      */
-     public function generatePdf(Request $request, Invoice $invoice)
+    public function generatePdf(Request $request, Invoice $invoice)
     {
         $userId = $request->user()->id;
-        
+
         $invoice->load('client');
         if ($invoice->client->user_id !== $userId) {
             abort(403);
         }
-        
+
         $invoice->load(['client.user', 'items', 'quotation']);
-        
-         // Get company information from the user who owns the client
+
+        // Get company information from the user who owns the client
         $user = null;
         if ($invoice->client && $invoice->client->user) {
             $user = $invoice->client->user;
         } else {
             $user = Auth::user();
         }
-        
+
         // Get company profile with fallback defaults
         $companyProfile = [
             'company_name' => ($user && isset($user->company_name)) ? $user->company_name : 'Your Company Name',
             'company_phone' => ($user && isset($user->company_phone)) ? $user->company_phone : (($user && isset($user->phone_number)) ? $user->phone_number : ''),
             'company_email' => ($user && isset($user->company_email)) ? $user->company_email : (($user && isset($user->email)) ? $user->email : ''),
             'company_website' => ($user && isset($user->company_website)) ? $user->company_website : '',
-             'company_address' => ($user && isset($user->company_address)) ? $user->company_address : '', 
+            'company_address' => ($user && isset($user->company_address)) ? $user->company_address : '',
         ];
-        
+
         // Generate PDF from blade view
         $pdf = Pdf::loadView('invoice-pdf', compact('invoice', 'companyProfile'));
-        
+
         // Set PDF options
         $pdf->setPaper('A4', 'portrait');
         $pdf->setOption('enable-local-file-access', true);
-        
+
         // Generate filename
-        $invoiceNumber = 'INV-' . str_pad($invoice->id, 6, '0', STR_PAD_LEFT);
+        $invoiceNumber = 'INV-'.$invoice->invoice_number;
         $filename = "Invoice_{$invoiceNumber}.pdf";
-        
+
         // Return PDF as download
         return $pdf->download($filename);
     }
@@ -447,8 +405,20 @@ class InvoiceController extends Controller
         if ($invoice->client->user_id !== $userId) {
             abort(403);
         }
-        
+
         $invoice->delete();
+
         return redirect()->route('invoices.index')->with('success', 'Invoice deleted.');
+    }
+
+    protected function generateInvoiceNumber(int $userId): string
+    {
+        $latestInvoice = Invoice::whereHas('client', function ($query) use ($userId) {
+            $query->where('user_id', $userId);
+        })->latest()->first();
+
+        $nextNumber = $latestInvoice ? intval($latestInvoice->invoice_number) + 1 : 1;
+
+        return str_pad($nextNumber, 6, '0', STR_PAD_LEFT);
     }
 }

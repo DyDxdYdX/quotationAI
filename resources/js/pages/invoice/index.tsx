@@ -41,6 +41,10 @@ interface Invoice {
     id: number;
     client_id: number;
     quotation_id: number | null;
+    phase_key: string | null;
+    phase_name: string | null;
+    phase_description: string | null;
+    phase_percentage: number | string | null;
     invoice_number: string;
     invoice_date: string;
     due_date: string;
@@ -332,6 +336,15 @@ export default function InvoiceIndex({
                                                         {invoice.quotation && (
                                                             <div className="text-xs text-muted-foreground">
                                                                 Ref: QTN-{invoice.quotation.quotation_number}
+                                                            </div>
+                                                        )}
+                                                        {invoice.phase_name && (
+                                                            <div className="text-xs text-blue-700 dark:text-blue-400">
+                                                                Phase: {invoice.phase_name} ({Number(invoice.phase_percentage).toLocaleString(undefined, {
+                                                                    minimumFractionDigits: 2,
+                                                                    maximumFractionDigits: 2,
+                                                                })}
+                                                                %)
                                                             </div>
                                                         )}
                                                     </TableCell>

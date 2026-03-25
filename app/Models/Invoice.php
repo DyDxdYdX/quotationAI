@@ -9,6 +9,10 @@ class Invoice extends Model
     protected $fillable = [
         'client_id',
         'quotation_id',
+        'phase_key',
+        'phase_name',
+        'phase_description',
+        'phase_percentage',
         'invoice_number',
         'invoice_date',
         'due_date',
@@ -21,6 +25,7 @@ class Invoice extends Model
     protected $casts = [
         'invoice_date' => 'date',
         'due_date' => 'date',
+        'phase_percentage' => 'decimal:2',
         'total_amount' => 'decimal:2',
     ];
 

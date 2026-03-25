@@ -30,4 +30,9 @@ class Quotation extends Model
     {
         return $this->belongsTo(QuotationRequest::class);
     }
+
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class);
+    }
 }

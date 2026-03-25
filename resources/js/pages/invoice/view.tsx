@@ -30,6 +30,10 @@ interface Invoice {
     id: number;
     client_id: number;
     quotation_id: number | null;
+    phase_key: string | null;
+    phase_name: string | null;
+    phase_description: string | null;
+    phase_percentage: number | string | null;
     invoice_number: string;
     invoice_date: string;
     due_date: string;
@@ -141,6 +145,15 @@ export default function ViewInvoice({ invoice }: { invoice: Invoice }) {
                                 </Link>
                             )}
                         </div>
+                        {invoice.phase_name && (
+                            <p className="mt-1 text-sm text-blue-700 dark:text-blue-400">
+                                Phase Billing: {invoice.phase_name} ({Number(invoice.phase_percentage).toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                })}
+                                %)
+                            </p>
+                        )}
                     </div>
                 </div>
 
@@ -200,6 +213,15 @@ export default function ViewInvoice({ invoice }: { invoice: Invoice }) {
                                         {new Date(invoice.due_date).toLocaleDateString(undefined, { dateStyle: 'long' })}
                                     </span>
                                 </div>
+                                {invoice.phase_name && (
+                                    <div className="flex flex-col md:col-span-2">
+                                        <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Billed Milestone</span>
+                                        <span className="font-medium">{invoice.phase_name}</span>
+                                        {invoice.phase_description && (
+                                            <span className="text-sm text-muted-foreground">{invoice.phase_description}</span>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>

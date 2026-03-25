@@ -451,9 +451,9 @@ export default function Quotation({
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="sm"
-                                                                    onClick={() => router.post(`/quotation/${quotation.id}/convert`)}
+                                                                    onClick={() => router.get(`/quotation/${quotation.id}`)}
                                                                     className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:text-blue-500 dark:hover:bg-blue-950/30"
-                                                                    title="Convert to Invoice"
+                                                                    title="Create phase invoice"
                                                                 >
                                                                     <FileText className="h-4 w-4" />
                                                                 </Button>
